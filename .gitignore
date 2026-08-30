@@ -30,6 +30,9 @@ dist/
 # brain/mail_config.example.json
 brain/mail_config.json
 
+# Mail pipeline local attachment cache — regenerated on each run
+brain/.cache/
+
 # Nested/embedded repos (their own .git) and harness worktree scratch state — not part of this repo
 05-agent-os/
 fathom-meeting-capture/
