@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent OS · Mail Tree</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"
+        integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i"
+        crossorigin="anonymous"></script>
+<style>
+  :root{
+    --bg:#0d1017; --panel:#151a23; --panel2:#1b2230; --line:#252d3a;
+    --ink:#e6ebf2; --muted:#8b96a8; --accent:#4dd0c4; --accent2:#5b8cff;
+    --cat:#6b7a99; --topic:#3fae90; --thread:#5b8cff; --link:#3a4356;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+       font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+  header{position:fixed;top:0;left:0;right:0;z-index:5;padding:18px 26px;border-bottom:1px solid var(--line);
+         display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;background:var(--bg)}
+  header h1{margin:0;font-size:20px;letter-spacing:.3px}
+  header h1 span{color:var(--accent)}
+  header .sub{color:var(--muted);font-size:13px}
+  header .counts{margin-left:auto;color:var(--muted);font-size:13px}
+  header .counts b{color:var(--ink)}
+  #chart{position:absolute;top:64px;left:0;right:0;bottom:0;cursor:grab}
+  #chart.grabbing{cursor:grabbing}
+  .node rect{stroke-width:1.5px;rx:10px;ry:10px}
+  .node text{fill:var(--ink);font-size:13px;pointer-events:none}
+  .node .toggle{cursor:pointer}
+  .node .toggle circle{fill:var(--panel2);stroke:var(--line)}
+  .node .toggle text{fill:var(--muted);font-size:11px;text-anchor:middle;dominant-baseline:central}
+  .node.root rect{fill:#20263a;stroke:var(--cat)}
+  .node.mail_category rect{fill:#20263a;stroke:var(--cat)}
+  .node.mail_topic rect{fill:#152a24;stroke:var(--topic)}
+  .node.mail_thread rect{fill:#151d30;stroke:var(--thread)}
+  .node.mail_thread{cursor:pointer}
+  .link{fill:none;stroke:var(--link);stroke-width:1.6px}
+
+  #detail{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:88vw;background:var(--panel);
+          border-left:1px solid var(--line);transform:translateX(100%);transition:transform .22s ease;
+          padding:22px 24px;overflow-y:auto;z-index:10}
+  #detail.open{transform:translateX(0)}
+  #detail .close{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);
+                 font-size:20px;cursor:pointer;line-height:1}
+  #detail h2{margin:0 30px 4px 0;font-size:18px}
+  #detail .path{color:var(--muted);font-size:12px;margin-bottom:16px}
+  #detail .lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:16px 0 6px}
+  #detail .summary{color:var(--ink);font-size:14px}
+  #detail .body{color:var(--muted);font-size:13px;white-space:pre-wrap;line-height:1.6}
+  #detail .uids{display:flex;flex-wrap:wrap;gap:6px}
+  #detail .uid{background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+               padding:2px 9px;font-size:11.5px;color:var(--muted)}
+  #hint{position:fixed;bottom:16px;left:26px;color:var(--muted);font-size:12px;z-index:5}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agent OS · <span>Mail Tree</span></h1>
+  <div class="sub">click a category/topic to expand · click a mail to read it</div>
+  <div class="counts" id="counts"></div>
+</header>
+
+<div id="chart"></div>
+<div id="hint">scroll to zoom · drag to pan</div>
+
+<div id="detail">
+  <button class="close" onclick="closeDetail()">&times;</button>
+  <div class="path" id="d-path"></div>
+  <h2 id="d-title"></h2>
+  <div class="lbl">Summary</div>
+  <div class="summary" id="d-summary"></div>
+  <div id="d-body-wrap" style="display:none">
+    <div class="lbl">Full content</div>
+    <div class="body" id="d-body"></div>
+  </div>
+  <div id="d-uids-wrap" style="display:none">
+    <div class="lbl">Source emails</div>
+    <div class="uids" id="d-uids"></div>
+  </div>
+</div>
+
+<script>
+const COLORS = { root: "#6b7a99", mail_category: "#6b7a99", mail_topic: "#3fae90", mail_thread: "#5b8cff" };
+
+let root, i = 0;
+const duration = 260;
+const nodeHeight = 44, nodeGapY = 14, levelWidth = 260;
+
+const svg = d3.select("#chart").append("svg").style("width", "100%").style("height", "100%");
+const zoomLayer = svg.append("g");
+const linkLayer = zoomLayer.append("g").attr("class", "links");
+const nodeLayer = zoomLayer.append("g").attr("class", "nodes");
+
+const zoom = d3.zoom().scaleExtent([0.3, 2]).on("zoom", (ev) => zoomLayer.attr("transform", ev.transform));
+svg.call(zoom);
+svg.on("mousedown.grab", () => document.getElementById("chart").classList.add("grabbing"));
+svg.on("mouseup.grab", () => document.getElementById("chart").classList.remove("grabbing"));
+
+function textWidth(text) {
+  return Math.max(150, Math.min(320, 16 + text.length * 7.2));
+}
+
+function collapse(d) {
+  if (d.children) { d._children = d.children; d._children.forEach(collapse); d.children = null; }
+}
+
+function toggle(d) {
+  if (d.children) { d._children = d.children; d.children = null; }
+  else if (d._children) { d.children = d._children; d._children = null; }
+}
+
+function nodeDepthColor(d) { return COLORS[d.data.type] || "#6b7a99"; }
+
+function update(source) {
+  const treeData = d3.tree().nodeSize([nodeHeight + nodeGapY, levelWidth])(root);
+  const nodes = treeData.descendants();
+  const links = treeData.links();
+
+  nodes.forEach((d) => { d.y = d.depth * levelWidth; });
+
+  const node = nodeLayer.selectAll("g.node").data(nodes, (d) => d.data.id);
+
+  const nodeEnter = node.enter().append("g")
+    .attr("class", (d) => "node " + d.data.type)
+    .attr("transform", () => `translate(${source.y0 ?? 0},${source.x0 ?? 0})`)
+    .style("opacity", 0)
+    .on("click", (ev, d) => {
+      if (d.data.type === "mail_thread") { openDetail(d); return; }
+      toggle(d);
+      update(d);
+    });
+
+  nodeEnter.append("rect")
+    .attr("width", (d) => textWidth(d.data.name))
+    .attr("height", nodeHeight)
+    .attr("x", 0).attr("y", -nodeHeight / 2)
+    .attr("stroke", nodeDepthColor);
+
+  nodeEnter.append("text")
+    .attr("x", 16).attr("y", 2).attr("dominant-baseline", "central")
+    .text((d) => d.data.name.length > 40 ? d.data.name.slice(0, 38) + "…" : d.data.name);
+
+  const toggleGroup = nodeEnter.filter((d) => d.data.type !== "mail_thread").append("g").attr("class", "toggle");
+  toggleGroup.attr("transform", (d) => `translate(${textWidth(d.data.name) + 14},0)`);
+  toggleGroup.append("circle").attr("r", 10);
+  toggleGroup.append("text").text((d) => (d.children ? "<" : (d._children || d.data.children) ? ">" : ""));
+
+  const nodeUpdate = nodeEnter.merge(node);
+  nodeUpdate.transition().duration(duration)
+    .attr("transform", (d) => `translate(${d.y},${d.x})`)
+    .style("opacity", 1);
+  nodeUpdate.select(".toggle text")
+    .text((d) => (d.children ? "<" : (d._children || (d.data.children && d.data.children.length)) ? ">" : ""));
+
+  node.exit().transition().duration(duration)
+    .attr("transform", () => `translate(${source.y},${source.x})`)
+    .style("opacity", 0).remove();
+
+  const link = linkLayer.selectAll("path.link").data(links, (d) => d.target.data.id);
+
+  const diagonal = (s, t) => {
+    const sx = s.y + textWidth(s.data.name), sy = s.x, tx = t.y, ty = t.x;
+    const mx = (sx + tx) / 2;
+    return `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`;
+  };
+
+  const linkEnter = link.enter().insert("path", "g")
+    .attr("class", "link")
+    .attr("d", () => {
+      const o = { x: source.x0 ?? 0, y: source.y0 ?? 0, data: { name: "" } };
+      return diagonal(o, o);
+    });
+
+  linkEnter.merge(link).transition().duration(duration)
+    .attr("d", (d) => diagonal(d.source, d.target));
+
+  link.exit().transition().duration(duration)
+    .attr("d", () => {
+      const o = { x: source.x, y: source.y, data: { name: "" } };
+      return diagonal(o, o);
+    }).remove();
+
+  nodes.forEach((d) => { d.x0 = d.x; d.y0 = d.y; });
+}
+
+function openDetail(d) {
+  const path = d.ancestors().reverse().slice(1, -1).map((n) => n.data.name).join(" › ");
+  document.getElementById("d-path").textContent = path;
+  document.getElementById("d-title").textContent = d.data.name;
+  document.getElementById("d-summary").textContent = d.data.summary || "(no summary)";
+  const bodyWrap = document.getElementById("d-body-wrap");
+  if (d.data.body) {
+    bodyWrap.style.display = "";
+    document.getElementById("d-body").textContent = d.data.body;
+  } else {
+    bodyWrap.style.display = "none";
+  }
+  const uidsWrap = document.getElementById("d-uids-wrap");
+  const uids = d.data.source_uids || [];
+  if (uids.length) {
+    uidsWrap.style.display = "";
+    document.getElementById("d-uids").innerHTML = uids.map((u) => `<span class="uid">uid ${u}</span>`).join("");
+  } else {
+    uidsWrap.style.display = "none";
+  }
+  document.getElementById("detail").classList.add("open");
+}
+
+function closeDetail() { document.getElementById("detail").classList.remove("open"); }
+
+function countNodes(n) {
+  let counts = { mail_category: 0, mail_topic: 0, mail_thread: 0 };
+  (function walk(node) {
+    if (counts[node.type] !== undefined) counts[node.type]++;
+    (node.children || []).forEach(walk);
+  })(n);
+  return counts;
+}
+
+fetch("/api/mail_tree").then((r) => r.json()).then((data) => {
+  const c = countNodes(data);
+  document.getElementById("counts").innerHTML =
+    `<b>${c.mail_category}</b> categories · <b>${c.mail_topic}</b> topics · <b>${c.mail_thread}</b> threads`;
+
+  root = d3.hierarchy(data);
+  root.x0 = 0;
+  root.y0 = 0;
+  // Start with categories expanded, topics collapsed — matches the reference screenshot.
+  root.children?.forEach((cat) => {
+    (cat.children || []).forEach(collapse);
+  });
+  update(root);
+
+  const svgNode = svg.node();
+  const initialScale = 0.9;
+  svg.call(zoom.transform, d3.zoomIdentity.translate(60, svgNode.clientHeight / 2).scale(initialScale));
+});
+</script>
+</body>
+</html>

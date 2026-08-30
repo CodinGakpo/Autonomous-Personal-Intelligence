@@ -136,6 +136,48 @@ async def ingest_resume_upload(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def _mail_children(conn: Any, parent_id: str) -> list[dict[str, Any]]:
+    return [
+        n for n in store.neighbors(conn, parent_id, "contains")
+        if n["type"] in ("mail_category", "mail_topic", "mail_thread")
+    ]
+
+
+def _mail_node(conn: Any, node: dict[str, Any]) -> dict[str, Any]:
+    children = [_mail_node(conn, c) for c in _mail_children(conn, node["id"])]
+    out: dict[str, Any] = {
+        "id": node["id"],
+        "name": node["title"],
+        "type": node["type"],
+        "summary": node.get("summary"),
+    }
+    if node["type"] == "mail_thread":
+        out["body"] = node["data"].get("body")
+        out["source_uids"] = node["data"].get("source_uids") or []
+    if children:
+        out["children"] = children
+    return out
+
+
+@app.get("/api/mail_tree")
+def mail_tree() -> dict[str, Any]:
+    """The mail knowledge tree (mail_category -> mail_topic -> mail_thread) as nested JSON,
+    rooted under a synthetic "Mail" node so the page always has a single root to render."""
+    conn = store.connect()
+    categories = store.all_of_type(conn, "mail_category")
+    return {
+        "id": "mail:root",
+        "name": "Mail",
+        "type": "root",
+        "children": [_mail_node(conn, c) for c in categories],
+    }
+
+
+@app.get("/mail-tree")
+def mail_tree_page() -> FileResponse:
+    return FileResponse(HERE / "mail_tree.html")
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(HERE / "viz.html")
