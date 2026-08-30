@@ -40,6 +40,9 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# Exclude the nested 05-agent-os/ checkout (its own test modules collide by basename with
+# ours) and the harness worktree scratch dir — neither is part of this project's test suite.
+addopts = ["--ignore=05-agent-os", "--ignore=.claude"]
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",
