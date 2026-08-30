@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Agent OS · Brain</title>
+<style>
+  :root{
+    --bg:#0d1017; --panel:#151a23; --panel2:#1b2230; --line:#252d3a;
+    --ink:#e6ebf2; --muted:#8b96a8; --accent:#4dd0c4; --accent2:#5b8cff;
+    --urgent:#ff5d5d; --high:#ff9f43; --medium:#5b8cff; --low:#8b96a8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{padding:26px 30px 18px;border-bottom:1px solid var(--line);
+         display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  header h1{margin:0;font-size:22px;letter-spacing:.3px}
+  header h1 span{color:var(--accent)}
+  header .sub{color:var(--muted);font-size:13px}
+  header .counts{margin-left:auto;color:var(--muted);font-size:13px}
+  header .counts b{color:var(--ink)}
+  main{padding:22px 30px 60px;max-width:1280px;margin:0 auto}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);
+     margin:30px 0 14px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+        display:flex;gap:8px;flex-direction:column}
+  .card .top{display:flex;gap:16px;align-items:center}
+  .card .who{flex:1;min-width:0}
+  .card .who h3{margin:0 0 2px;font-size:18px}
+  .card .who .role{color:var(--accent);font-size:13px;font-weight:600}
+  .card .who .meta{color:var(--muted);font-size:12px;margin-top:3px}
+  .radar{flex:0 0 auto}
+  .ring{fill:none;stroke:var(--line)}
+  .spoke{stroke:var(--line)}
+  .axlabel{fill:var(--muted);font-size:9.5px}
+  .datapoly{fill:rgba(77,208,196,.20);stroke:var(--accent);stroke-width:2}
+  .dot{fill:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+        padding:3px 10px;font-size:12px;color:var(--muted)}
+  .summary{color:var(--muted);font-size:13px;margin:2px 0 0}
+  .tasks{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
+  .tasks .lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px}
+  .task{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13.5px}
+  .task .pri{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .task .due{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
+  .pri-urgent{background:var(--urgent)} .pri-high{background:var(--high)}
+  .pri-medium{background:var(--medium)} .pri-low,.pri-none{background:var(--low)}
+  .flag{font-size:11px;color:var(--high);border:1px solid var(--high);border-radius:6px;padding:1px 6px}
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .tcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .tcard h4{margin:0 0 6px;font-size:14.5px;font-weight:600}
+  .tcard .row{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px}
+  .tcard .assignee{color:var(--ink)}
+  .meetings{display:flex;gap:12px;flex-wrap:wrap}
+  .mcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;max-width:420px}
+  .mcard h4{margin:0 0 4px;font-size:14px}
+  .mcard .date{color:var(--accent);font-size:12px}
+  .mcard p{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+  .empty{color:var(--muted);padding:40px 0;text-align:center}
+  .empty code{background:var(--panel2);padding:2px 7px;border-radius:6px;color:var(--ink)}
+  .radarwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .fit{display:flex;flex-direction:column;align-items:center;line-height:1.05;border-radius:10px;padding:7px 14px;min-width:66px}
+  .fit b{font-size:21px} .fit span{font-size:9.5px;color:var(--muted);margin-top:3px;text-align:center}
+  .fit-hi{background:rgba(77,208,196,.14);color:var(--accent);border:1px solid rgba(77,208,196,.4)}
+  .fit-mid{background:rgba(255,159,67,.12);color:var(--high);border:1px solid rgba(255,159,67,.4)}
+  .fit-lo{background:rgba(255,93,93,.12);color:var(--urgent);border:1px solid rgba(255,93,93,.4)}
+  .tag{font-size:10px;background:var(--accent2);color:#fff;border-radius:6px;padding:2px 8px;vertical-align:middle;font-weight:600}
+  .details{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+  .details summary{cursor:pointer;color:var(--muted);font-size:12px}
+  .details summary:hover{color:var(--ink)}
+  .dblock{margin-top:12px} .dh{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px}
+  .dh.flagh{color:var(--high)}
+  .ev{display:flex;gap:10px;margin:5px 0;font-size:12.5px}
+  .ev .evk{flex:0 0 118px;color:var(--ink)} .ev .evk b{color:var(--accent)} .ev .evv{color:var(--muted)}
+  .details ul{margin:4px 0;padding-left:16px;color:var(--muted);font-size:12.5px}
+  .details ul li{margin:3px 0} .details ul.flags{color:var(--high)}
+  .dim{color:var(--muted);font-size:11px}
+  .askbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:10px}
+  .askbox .q{display:flex;gap:10px}
+  .askbox input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+    padding:11px 14px;font:15px -apple-system,Segoe UI,Roboto,sans-serif;outline:none}
+  .askbox input:focus{border-color:var(--accent)}
+  .askbox button{background:var(--accent);color:#06231f;border:none;border-radius:10px;padding:0 22px;
+    font-weight:700;font-size:14px;cursor:pointer}
+  .askbox button:disabled{opacity:.5;cursor:default}
+  .askbox .hint{color:var(--muted);font-size:12px;margin-top:9px}
+  .askbox .hint .ex{color:var(--accent);cursor:pointer;border-bottom:1px dashed var(--line)}
+  .answer{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:none}
+  .answer.show{display:block}
+  .answer .a{font-size:15.5px;line-height:1.55}
+  .answer .path{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;align-items:center}
+  .answer .path .plbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-right:2px}
+  .answer .src{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12px}
+  .answer .src .st{color:var(--accent);text-transform:uppercase;font-size:9.5px;letter-spacing:.5px;margin-right:5px}
+  .answer .how{color:var(--muted);font-size:12.5px;margin-top:11px;font-style:italic}
+  .answer .thinking{color:var(--muted);font-size:13.5px}
+  .adder{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+  .adder input[type=file]{color:var(--muted);font-size:13px;max-width:250px}
+  .adder input[type=file]::file-selector-button{background:var(--panel2);color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:6px 12px;margin-right:10px;cursor:pointer;font-size:13px}
+  .adder input[type=text]{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    padding:8px 11px;font:13px -apple-system,Segoe UI,Roboto,sans-serif;outline:none;width:190px}
+  .adder input[type=text]:focus{border-color:var(--accent)}
+  .adder .rcand{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
+  .adder button{background:var(--accent);color:#06231f;border:none;border-radius:8px;padding:8px 16px;
+    font-weight:700;font-size:13px;cursor:pointer}
+  .adder button:disabled{opacity:.5;cursor:default}
+  .adder .rstatus{color:var(--muted);font-size:12.5px;flex-basis:100%;margin-top:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent OS <span>·</span> Brain</h1>
+  <div class="sub">live from <code>brain.db</code> — capabilities &amp; action items</div>
+  <div class="counts" id="counts"></div>
+</header>
+<main>
+  <section class="askbox">
+    <div class="q">
+      <input id="q" placeholder="Ask the brain…  e.g. who is the best fit for the backend role?" autocomplete="off"/>
+      <button id="askbtn">Ask</button>
+    </div>
+    <div class="hint">Try:
+      <span class="ex">who is the best fit for the backend role, and why?</span> ·
+      <span class="ex">which task is most urgent and who owns it?</span> ·
+      <span class="ex">what still needs review?</span>
+    </div>
+    <div class="answer" id="answer"></div>
+  </section>
+  <div id="app"><div class="empty">Loading the brain…</div></div>
+</main>
+
+<script>
+const AXES = [
+  ["technical_depth","Tech Depth"],
+  ["stack_breadth","Breadth"],
+  ["delivery_scale","Delivery"],
+  ["work_experience","Experience"],
+  ["communication","Comms"],
+  ["leadership_ownership","Leadership"],
+];
+
+function radarSVG(radar){
+  const cx=135, cy=118, R=70, n=AXES.length;
+  const ang = i => (-90 + i*360/n)*Math.PI/180;
+  const pt = (i,r)=>[cx + r*Math.cos(ang(i)), cy + r*Math.sin(ang(i))];
+  let s="";
+  for(const pct of [25,50,75,100]){
+    s += `<polygon class="ring" points="${AXES.map((_,i)=>pt(i,R*pct/100).map(v=>v.toFixed(1)).join(',')).join(' ')}"/>`;
+  }
+  AXES.forEach(([key,label],i)=>{
+    const [x,y]=pt(i,R);
+    s += `<line class="spoke" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+    const [lx,ly]=pt(i,R+13);
+    const anchor = lx<cx-4?"end":lx>cx+4?"start":"middle";
+    const yy = ly<cy-4 ? ly-1 : ly>cy+4 ? ly+8 : ly+3;
+    s += `<text class="axlabel" x="${lx.toFixed(1)}" y="${yy.toFixed(1)}" text-anchor="${anchor}">${label}</text>`;
+  });
+  const dpts = AXES.map(([key],i)=>{
+    const sc=(radar[key]&&radar[key].score)||0; return pt(i,R*sc/100).map(v=>v.toFixed(1)).join(',');
+  }).join(' ');
+  s += `<polygon class="datapoly" points="${dpts}"/>`;
+  AXES.forEach(([key],i)=>{
+    const sc=(radar[key]&&radar[key].score)||0; const [x,y]=pt(i,R*sc/100);
+    s += `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"/>`;
+  });
+  return `<svg class="radar" width="230" height="210" viewBox="0 0 270 215">${s}</svg>`;
+}
+
+const pri = p => "pri-" + (p || "none");
+const esc = t => (t==null?"":String(t)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function fitClass(f){ return f==null?"fit-mid":f>=75?"fit-hi":f>=55?"fit-mid":"fit-lo"; }
+
+function personCard(p){
+  const skills = p.skills.slice(0,8).map(s=>`<span class="chip">${esc(s)}</span>`).join("");
+  const tasks = p.tasks.map(t=>`
+    <div class="task"><span class="pri ${pri(t.priority)}"></span>
+      <span>${esc(t.name)}</span>${t.due?`<span class="due">due ${esc(t.due)}</span>`:""}</div>`).join("")
+    || `<div class="task" style="color:var(--muted)">no assigned tasks</div>`;
+  const meta = [p.seniority, p.years?`${p.years} yrs`:null].filter(Boolean).join(" · ");
+  const fit = (p.fit_score!=null)
+    ? `<div class="fit ${fitClass(p.fit_score)}"><b>${p.fit_score}</b><span>fit${p.target_role?"<br>"+esc(p.target_role):""}</span></div>` : "";
+  const tag = p.kind==="candidate" ? '<span class="tag">Candidate</span>' : "";
+
+  const evid = AXES.map(([key,label])=>{
+    const r=p.radar[key]; if(!r) return "";
+    return `<div class="ev"><span class="evk">${label} <b>${r.score||0}</b></span><span class="evv">${esc(r.evidence||"—")}</span></div>`;
+  }).join("");
+  const exp = (p.roles||[]).map(r=>{
+    const when=[r.start,r.end].filter(Boolean).join(" – ");
+    return `<li><b>${esc(r.title||"")}</b>${r.company?" · "+esc(r.company):""} ${when?`<span class="dim">${esc(when)}</span>`:""}</li>`;
+  }).join("");
+  const edu = (p.education||[]).map(e=>{
+    const deg=[e.degree,e.field].filter(Boolean).join(", ");
+    return `<li>${esc(deg)}${e.institution?" — "+esc(e.institution):""} ${e.year?`<span class="dim">${esc(e.year)}</span>`:""}</li>`;
+  }).join("");
+  const flags = (p.flags||[]).map(f=>`<li>${esc(f)}</li>`).join("");
+  const details = `<details class="details"><summary>Why these scores · work history · flags</summary>
+    <div class="dblock"><div class="dh">Evidence behind the radar</div>${evid||'<div class="dim">—</div>'}</div>
+    ${exp?`<div class="dblock"><div class="dh">Experience</div><ul>${exp}</ul></div>`:""}
+    ${edu?`<div class="dblock"><div class="dh">Education</div><ul>${edu}</ul></div>`:""}
+    ${flags?`<div class="dblock"><div class="dh flagh">Flags / risks</div><ul class="flags">${flags}</ul></div>`:""}
+  </details>`;
+
+  return `<div class="card">
+    <div class="top">
+      <div class="who">
+        <h3>${esc(p.name)} ${tag} ${p.needs_review?'<span class="flag">review</span>':""}</h3>
+        <div class="role">${esc(p.headline||"")}</div>
+        ${meta?`<div class="meta">${esc(meta)}</div>`:""}
+        ${p.summary?`<p class="summary">${esc(p.summary)}</p>`:""}
+      </div>
+      <div class="radarwrap">${radarSVG(p.radar)}${fit}</div>
+    </div>
+    <div class="chips">${skills}</div>
+    <div class="tasks"><div class="lbl">Assigned tasks</div>${tasks}</div>
+    ${details}
+  </div>`;
+}
+
+function taskCard(t){
+  return `<div class="tcard">
+    <h4>${esc(t.name)} ${t.needs_review?'<span class="flag">review</span>':''}</h4>
+    <div class="row"><span class="pri ${pri(t.priority)}"></span>
+      <span class="assignee">${esc(t.assignee||"unassigned")}</span>
+      ${t.priority?`· ${esc(t.priority)}`:""}${t.due?` · due ${esc(t.due)}`:""}</div>
+  </div>`;
+}
+
+// --- Ask the brain: question -> answer + the node path it walked (provenance) ---
+const qEl=document.getElementById("q"), askBtn=document.getElementById("askbtn"), ansEl=document.getElementById("answer");
+function renderAnswer(res){
+  const path=(res.path||[]).map(n=>`<span class="src"><span class="st">${esc(n.type)}</span>${esc(n.title)}</span>`).join("");
+  ansEl.innerHTML = `<div class="a">${esc(res.answer||"(no answer)")}</div>`
+    + (path?`<div class="path"><span class="plbl">Sources · the path walked</span>${path}</div>`:"")
+    + (res.reasoning?`<div class="how">${esc(res.reasoning)}</div>`:"");
+}
+async function doAsk(){
+  const q=qEl.value.trim(); if(!q) return;
+  askBtn.disabled=true; ansEl.classList.add("show");
+  ansEl.innerHTML=`<div class="thinking">Thinking — walking the graph…</div>`;
+  try{
+    const r=await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})});
+    renderAnswer(await r.json());
+  }catch(e){ ansEl.innerHTML=`<div class="thinking">Couldn't reach the brain: ${esc(e)}</div>`; }
+  askBtn.disabled=false;
+}
+askBtn.addEventListener("click",doAsk);
+qEl.addEventListener("keydown",e=>{ if(e.key==="Enter") doAsk(); });
+document.querySelectorAll(".ex").forEach(el=>el.addEventListener("click",()=>{ qEl.value=el.textContent.trim(); doAsk(); }));
+
+// --- Add résumé: upload a PDF/DOCX, parse via the résumé parser, add to the talent list ---
+function adderBar(){
+  return `<div class="adder">
+    <input type="file" id="rfile" accept=".pdf,.docx"/>
+    <input type="text" id="rrole" placeholder="target role (optional)"/>
+    <label class="rcand"><input type="checkbox" id="rcand" checked/> candidate</label>
+    <button id="rparse">Parse &amp; add</button>
+    <span class="rstatus" id="rstatus"></span>
+  </div>`;
+}
+function wireUploader(){
+  const f=document.getElementById("rfile"), btn=document.getElementById("rparse"),
+        st=document.getElementById("rstatus"), role=document.getElementById("rrole"),
+        cand=document.getElementById("rcand");
+  if(!btn) return;
+  btn.onclick = async () => {
+    if(!f.files.length){ st.textContent="Pick a PDF or DOCX first."; return; }
+    const file=f.files[0], fd=new FormData();
+    fd.append("file", file); fd.append("role", role.value.trim());
+    fd.append("candidate", cand.checked ? "1" : "");
+    btn.disabled=true;
+    st.textContent = `Parsing ${file.name}…  (~30s — reading the résumé)`;
+    try{
+      const r=await fetch("/api/ingest_resume",{method:"POST",body:fd});
+      const d=await r.json();
+      if(!r.ok || d.error){ st.textContent = "Error: " + (d.error || ("HTTP "+r.status)); btn.disabled=false; return; }
+      await loadData();     // new/updated card appears, re-ranked by fit
+    }catch(e){ st.textContent="Failed: "+e; btn.disabled=false; }
+  };
+}
+
+async function loadData(){
+  try{
+    const d = await (await fetch("/api/data")).json();
+    document.getElementById("counts").innerHTML =
+      `<b>${d.people.length}</b> people · <b>${d.tasks.length}</b> tasks · <b>${d.meetings.length}</b> meetings`;
+    let html = `<h2>Talent &mdash; ranked by fit</h2>` + adderBar();
+    if(d.people.length){
+      d.people.sort((a,b)=>(b.fit_score||0)-(a.fit_score||0));
+      html += `<div class="grid">${d.people.map(personCard).join("")}</div>`;
+    } else {
+      html += `<div class="empty" style="padding:16px 0">No candidates yet — add a résumé above.</div>`;
+    }
+    if(d.tasks.length){
+      html += `<h2>Action Items</h2><div class="board">${d.tasks.map(taskCard).join("")}</div>`;
+    }
+    if(d.meetings.length){
+      html += `<h2>Meetings</h2><div class="meetings">${d.meetings.map(m=>`
+        <div class="mcard"><h4>${esc(m.title)}</h4>${m.date?`<div class="date">${esc(m.date)}</div>`:""}
+        ${m.summary?`<p>${esc(m.summary)}</p>`:""}</div>`).join("")}</div>`;
+    }
+    document.getElementById("app").innerHTML = html;
+    wireUploader();
+  }catch(e){
+    document.getElementById("app").innerHTML =
+      `<div class="empty">Couldn't reach the brain API.<br><small>${esc(e)}</small></div>`;
+  }
+}
+loadData();
+</script>
+</body>
+</html>

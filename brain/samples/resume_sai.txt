@@ -1,0 +1,24 @@
+Sai Prakash
+Backend Engineer
+Email: sai.prakash@example.com | Bengaluru, India
+LinkedIn: linkedin.com/in/saiprakash | GitHub: github.com/saiprakash
+
+SUMMARY
+Backend engineer with 5 years building high-throughput APIs and data pipelines in Python and Go.
+Shipped payment and notification systems handling 10M+ requests/day.
+
+EXPERIENCE
+Senior Backend Engineer, PayFlow (2023 - present)
+- Led redesign of the payments API (Python/FastAPI, Postgres), cutting p99 latency 40%.
+- Built an event-driven notification pipeline (Kafka) serving 10M+ events/day.
+- Mentored 3 junior engineers; owned on-call and incident reviews.
+
+Backend Engineer, DataNest (2020 - 2023)
+- Built ETL pipelines in Python (Airflow) ingesting 2TB/day.
+- Designed the internal metrics service (Go, gRPC).
+
+SKILLS
+Python, Go, FastAPI, Postgres, Kafka, Airflow, Docker, AWS, gRPC, Redis
+
+EDUCATION
+B.Tech Computer Science, NIT Trichy, 2020

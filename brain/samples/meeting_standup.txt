@@ -1,0 +1,23 @@
+Team Standup - June 30, 2026
+
+Usman: Morning everyone. Quick round. Sai, where are we on the payments API?
+
+Sai: The refactor is mostly done. I need to finish the retry logic and add tests. I'll wrap that up by Wednesday.
+
+Usman: Great. Can you also write up the migration doc for the team?
+
+Sai: Yeah, I'll get the migration doc done this week.
+
+Usman: Pruthvik, the auth review?
+
+Pruthvik: I finished the JWT hardening. Next I need to run the pen-test on the new endpoints - I'll have results by Friday.
+
+Usman: Perfect. Also we got a customer request - someone needs to secure the file-upload route. Pruthvik, can you take that?
+
+Pruthvik: Sure, I'll secure the file-upload route. It's a bit urgent since a customer flagged it.
+
+Usman: Manikandan mentioned the dashboard feels slow, but he's out today, so let's park that for now. Thanks all - that's it.
+
+Sai: Cool, lunch at the usual place?
+
+Pruthvik: Works for me.

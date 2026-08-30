@@ -1,0 +1,23 @@
+Pruthvik Jadhav
+Security Engineer
+Email: jbpruthvik@example.com | Pune, India
+GitHub: github.com/pruthvik
+
+SUMMARY
+Security engineer with 3 years securing web platforms - API security, auth (JWT/OAuth), and
+pen-testing. Comfortable talking to customers and running security reviews.
+
+EXPERIENCE
+Security Engineer, SecureStack (2022 - present)
+- Hardened API routes with JWT/OAuth2; ran quarterly pen-tests.
+- Built an automated secrets-scanning pipeline for CI.
+- Presented security posture to enterprise customers in pre-sales calls.
+
+Junior Developer, WebForge (2021 - 2022)
+- Full-stack features (React, Node).
+
+SKILLS
+JWT, OAuth2, Python, Node.js, Burp Suite, pen-testing, API security, CI/CD
+
+EDUCATION
+B.E. Information Technology, COEP Pune, 2021
