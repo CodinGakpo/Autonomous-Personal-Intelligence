@@ -1,0 +1,21 @@
+# Ops-console backend image. Build context = repo root (needs clickup/ + console/).
+#   docker build -f console/deploy/Dockerfile.backend -t ops-console-backend .
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir uv
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+# Deps first (cache layer)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev
+
+# Source: the overlay clients + the console backend (not the frontend)
+COPY clickup ./clickup
+COPY tools ./tools
+COPY skills ./skills
+COPY console/__init__.py ./console/__init__.py
+COPY console/backend ./console/backend
+
+EXPOSE 8000
+CMD ["uv", "run", "--no-dev", "uvicorn", "console.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

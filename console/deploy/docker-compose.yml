@@ -1,0 +1,48 @@
+# Unraid / self-hosted deploy. From console/deploy: `docker compose up --build`.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ops}
+      POSTGRES_DB: ${POSTGRES_DB:-ops_console}
+    volumes:
+      - ops_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ops}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: console/deploy/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ops}:${POSTGRES_PASSWORD:-ops}@db:5432/${POSTGRES_DB:-ops_console}
+      OPS_SECRET_KEY: ${OPS_SECRET_KEY:-dev-secret-change-me-in-production-32b}
+      CLICKUP_TOKEN: ${CLICKUP_TOKEN:-}
+      CLICKUP_EMPLOYEES_LIST_ID: ${CLICKUP_EMPLOYEES_LIST_ID:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      FATHOM_API_KEY: ${FATHOM_API_KEY:-}
+      OPS_ADMIN_EMAIL: ${OPS_ADMIN_EMAIL:-admin@agent-os.local}
+      OPS_ADMIN_PASSWORD: ${OPS_ADMIN_PASSWORD:-changeme}
+      OPS_CORS_ORIGINS: ${OPS_CORS_ORIGINS:-http://localhost:8080}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  ops_db:
