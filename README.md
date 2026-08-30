@@ -53,7 +53,7 @@ Agent OS eliminates the gap between **conversation and action**. When a Fathom m
 ┌─────────────────────────────────────────────────────────────────┐
 │                          TRACK A  LOOP                          │
 │                                                                  │
-│  Slack (Fenil)        Fathom API        Hermes        ClickUp   │
+│  Slack                Fathom API        Hermes        ClickUp   │
 │       │                   │               │               │      │
 │  "Summarise meeting" ─►   │               │               │      │
 │       │            fetch_transcript()     │               │      │
@@ -245,7 +245,7 @@ Login with the seeded admin `admin@agent-os.local` / `changeme`.
 ### The Golden Rule
 
 ```
-one issue  →  one branch  →  one PR  →  Usman reviews & merges
+one issue  →  one branch  →  one PR  →  reviewed & merged
 ```
 
 Direct pushes to `main` are not permitted. Branch protection requires a passing `CI / harness` check before any merge is allowed.
@@ -253,9 +253,9 @@ Direct pushes to `main` are not permitted. Branch protection requires a passing 
 ### Step-by-Step
 
 ```bash
-# 1. Pick up your task from docs/team/assignments.md
+# 1. Pick up your task from the tracker
 # 2. Create a branch using the convention: name/task-number-description
-git checkout -b yogesh/task-14-readme-verification
+git checkout -b name/task-14-readme-verification
 
 # 3. Make your changes
 
@@ -273,7 +273,7 @@ git commit -m "docs: add README and final verification (task 14)"
 git push -u origin HEAD
 gh pr create --fill
 
-# 8. CI must pass. Usman reviews. Merge.
+# 8. CI must pass, review approved. Merge.
 ```
 
 ### Daily Standup Format (Slack, ~10 minutes)
@@ -567,7 +567,7 @@ uv run behave
 ```gherkin
 # features/meeting_to_task.feature
 Feature: Meeting to task
-  As Fenil
+  As a user
   I want to point the co-pilot at a Fathom meeting
   So that action items are automatically created in ClickUp
 
@@ -613,10 +613,10 @@ deploy/
 └── docker-compose.yml   # Hermes + agent-os overlay on Unraid
 ```
 
-**Deployment is owned by Usman.** Do not deploy to production without his explicit sign-off.
+**Deployment is owned by the tech lead.** Do not deploy to production without explicit sign-off.
 
 ```bash
-# On the Unraid server (Usman only)
+# On the Unraid server (tech lead only)
 docker compose -f deploy/docker-compose.yml up -d
 
 # View logs
@@ -664,23 +664,6 @@ Full roadmap context: [`docs/superpowers/specs/2026-06-07-agent-os-poc-design.md
 
 ---
 
-## Team
-
-| Person | Role | Track B Responsibility |
-|---|---|---|
-| **Usman** | Team Lead & DevOps | Tasks 1, 2, 3, 12, 13 — owns the full harness chain |
-| **Manikandan K.B** | Full-stack & Slack Workflows | Task 5 (import-linter), Task 7 (PRD template) |
-| **Hirak Parekh** | ML & Research Integration | Task 9 (BDD) — intern until 6 Jul |
-| **Sajal Mondal** | Java / Spring / Typed Systems | Task 4 (mypy) |
-| **Pruthvik J.** | Systems Design & Implementation | Task 6 (ADR template), Task 11 (design-system stub) |
-| **Ayush Kumar** | Developer | Tasks 8, 10 (paired with Pruthvik) |
-| **Sudeep C N** | Developer (Google Meet Recorder) | Task 9 (BDD, paired with Hirak) |
-| **Yogesh K K** | Documentation & Verification | **Task 14 — this README and final green-build verification** |
-
-**Product Owner:** Fenil Parekh &nbsp;·&nbsp; **Tech Lead / DevOps:** Usman
-
----
-
 ## Quick Links
 
 | Resource | Location |
@@ -688,8 +671,6 @@ Full roadmap context: [`docs/superpowers/specs/2026-06-07-agent-os-poc-design.md
 | POC design spec | [`docs/superpowers/specs/2026-06-07-agent-os-poc-design.md`](docs/superpowers/specs/2026-06-07-agent-os-poc-design.md) |
 | Track A plan | [`docs/superpowers/plans/2026-06-07-track-a-copilot-loop.md`](docs/superpowers/plans/2026-06-07-track-a-copilot-loop.md) |
 | Track B plan | [`docs/superpowers/plans/2026-06-07-track-b-engineering-harness.md`](docs/superpowers/plans/2026-06-07-track-b-engineering-harness.md) |
-| Team assignments | [`docs/team/assignments.md`](docs/team/assignments.md) |
-| Kickoff runbook | [`docs/team/usman-kickoff.md`](docs/team/usman-kickoff.md) |
 | Contributor guide | [`AGENTS.md`](AGENTS.md) |
 | ADR-0001 | [`docs/adr/0001-module-boundaries.md`](docs/adr/0001-module-boundaries.md) |
 | Known solutions | [`docs/solutions/`](docs/solutions/) |
