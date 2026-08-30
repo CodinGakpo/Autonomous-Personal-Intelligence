@@ -1,0 +1,36 @@
+# Claude Code — personal overrides stay local; shared config (settings.json) is committed
+.claude/settings.local.json
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Local databases — the dev SQLite console DB holds the seeded admin (hashed); never commit it
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+.DS_Store
+
+# Mail pipeline local config — may hold personal info (student_id, resume_path); copy from
+# brain/mail_config.example.json
+brain/mail_config.json
+
+# Nested/embedded repos (their own .git) and harness worktree scratch state — not part of this repo
+05-agent-os/
+fathom-meeting-capture/
+.claude/worktrees/

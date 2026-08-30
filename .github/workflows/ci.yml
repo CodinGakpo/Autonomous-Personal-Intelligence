@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Thin harness slice (Plan 1). Each later task APPENDS its step to this job:
+#   Task 4  -> Mypy           (uv run mypy)            [needs scripts/ to exist]
+#   Task 5  -> Architecture    (uv run lint-imports)
+#   Task 8  -> Spec presence   (uv run python scripts/check_specs.py) + Pytest
+#   Task 9  -> BDD             (uv run behave)
+#   Task 10 -> Duplication + Markdown lint (npx jscpd / markdownlint-cli2; add Node setup)
+#   Task 11 -> Inline styles   (uv run python scripts/check_inline_styles.py)
+# The job is named `harness` so branch protection can require the `CI / harness` check.
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Install deps
+        run: uv sync
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Mypy
+        run: uv run mypy
+      - name: Architecture (ADRs)
+        run: uv run lint-imports
+      - name: Pytest
+        run: uv run pytest -q
+        

@@ -1,0 +1,36 @@
+# Thin harness slice (Plan 1). Each later task APPENDS its hook here:
+#   Task 4  -> mypy          (uv run mypy)            [needs scripts/ to exist]
+#   Task 5  -> import-linter  (uv run lint-imports)
+#   Task 8  -> check-specs    (uv run python scripts/check_specs.py)
+#   Task 9  -> behave         (uv run behave)
+#   Task 11 -> check-inline-styles (uv run python scripts/check_inline_styles.py)
+# Until then, ruff (format + lint) is the live local gate.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+      - id: ruff-lint
+        name: ruff lint
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+      - id: import-linter
+        name: architecture (ADRs)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q
+        language: system
+        pass_filenames: false
+        

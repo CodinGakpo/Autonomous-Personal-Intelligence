@@ -1,0 +1,74 @@
+[project]
+name = "agent-os"
+version = "0.0.0"
+description = "Agent OS — second brain for the company (overlay on Hermes Agent)"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.34.2",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "pyjwt>=2.9",
+    "pypdf>=6.14.2",
+    "openpyxl>=3.1",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.32",
+    "python-dotenv>=1.2.2",
+    "slack-bolt>=1.29.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "import-linter>=2.0",
+    "behave>=1.2.6",
+    "pre-commit>=3.8",
+    "pytest>=8.0",
+    "types-requests>=2.33.0.20260518",
+    "responses>=0.26.1",
+    "httpx>=0.27",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+    "ignore:.*Using `httpx` with `starlette.testclient` is deprecated.*:DeprecationWarning",
+    "ignore:.*StarletteDeprecationWarning.*",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["tools", "clickup", "skills", "scripts", "console"]
+
+[tool.importlinter]
+root_packages = ["tools", "clickup", "skills", "console"]
+
+[[tool.importlinter.contracts]]
+name = "Fathom tool must not import ClickUp (ADR-0001)"
+type = "forbidden"
+source_modules = ["tools.fathom"]
+forbidden_modules = ["clickup"]
+
+[[tool.importlinter.contracts]]
+name = "Tools must not import skills (ADR-0001)"
+type = "forbidden"
+source_modules = ["tools"]
+forbidden_modules = ["skills"]
+
+[[tool.importlinter.contracts]]
+name = "Core packages must not import the console (ADR-0002)"
+type = "forbidden"
+source_modules = ["clickup", "tools", "skills"]
+forbidden_modules = ["console"]

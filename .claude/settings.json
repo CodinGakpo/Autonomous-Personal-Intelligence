@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/*/.claude/plugins/**)",
+      "Bash(claude plugin *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:hermes-agent.nousresearch.com)",
+      "Bash(*)",
+      "Bash(git config *)"
+    ]
+  }
+}
