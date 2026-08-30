@@ -24,6 +24,35 @@ def test_slugify():
     assert mail_ingest._slugify("") == "untitled"
 
 
+_CATEGORY_KEYWORDS = {
+    "Placements": ["placement", "internship", "accenture", "training", "registration"],
+    "Academics": ["assignment", "submission", "exam", "faculty", "project", "phase"],
+}
+
+
+def test_guess_category_bm25_picks_the_clear_winner():
+    text = "Fwd: Accenture Batch1 Training for 2027 Batch registration open"
+    assert mail_ingest.guess_category_bm25(text, _CATEGORY_KEYWORDS) == "Placements"
+
+
+def test_guess_category_bm25_picks_the_other_clear_winner():
+    text = "BCSE332L Project Phase 4 submission instructions before the exam"
+    assert mail_ingest.guess_category_bm25(text, _CATEGORY_KEYWORDS) == "Academics"
+
+
+def test_guess_category_bm25_returns_none_when_no_keywords_match():
+    assert mail_ingest.guess_category_bm25("Let's get lunch tomorrow", _CATEGORY_KEYWORDS) is None
+
+
+def test_guess_category_bm25_returns_none_on_empty_config():
+    assert mail_ingest.guess_category_bm25("Accenture training", {}) is None
+
+
+def test_guess_category_bm25_returns_none_on_a_tie():
+    tied = {"A": ["accenture"], "B": ["accenture"]}
+    assert mail_ingest.guess_category_bm25("Accenture email", tied) is None
+
+
 def test_classify_email_parses_llm_json(monkeypatch):
     reply = (
         '{"category": "Placements", "new_category": false, '
@@ -69,6 +98,33 @@ def _email(uid="1", subject="Interview Round 1"):
         "uid": uid, "from": "hr@acme.com", "to": "me@x.com", "subject": subject,
         "body_text": "...", "attachments": [],
     }
+
+
+def test_ingest_email_overrides_llm_category_with_confident_bm25_guess(tmp_path, monkeypatch):
+    conn = _conn(tmp_path)
+    email = _email(uid="9", subject="Accenture Batch1 Training registration")
+    monkeypatch.setattr(
+        mail_ingest, "classify_email",
+        # LLM (wrongly) says Academics; the deterministic guess should override it to Placements.
+        lambda email, findings, categories: {
+            "category": "Academics", "new_category": True, "topic": "Accenture", "new_topic": True,
+        },
+    )
+    monkeypatch.setattr(
+        mail_ingest, "merge_or_create_thread",
+        lambda email, findings, existing: {
+            "action": "new", "merge_into_id": None, "summary": "s", "body": "b",
+        },
+    )
+    config = {
+        "student_id": "", "resume_path": "",
+        "category_keywords": mail_ingest.DEFAULT_CONFIG["category_keywords"],
+    }
+    result = mail_ingest.ingest_email(conn, email, config)
+
+    assert result["category"] == "Placements"
+    assert store.get(conn, "mail:cat:placements") is not None
+    assert store.get(conn, "mail:cat:academics") is None
 
 
 def test_ingest_email_creates_category_topic_and_thread(tmp_path, monkeypatch):

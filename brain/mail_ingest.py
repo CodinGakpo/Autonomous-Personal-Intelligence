@@ -16,9 +16,11 @@ Usage:
 from __future__ import annotations
 
 import json
+import math
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,26 @@ DEFAULT_CONFIG = {
     "student_id": "",
     "resume_path": "",
     "seeded_categories": ["Lectures & Profs", "Placements", "General College"],
+    "category_keywords": {
+        "Lectures & Profs": [
+            "lecture", "lectures", "guest lecture", "professor", "faculty",
+            "assignment", "submission", "class", "classes", "syllabus", "course",
+            "curriculum", "lab", "seminar", "tutorial", "instructor", "grade",
+            "marks", "attendance",
+        ],
+        "Placements": [
+            "placement", "placements", "internship", "recruiter", "recruitment",
+            "hiring", "ctc", "stipend", "off-campus", "on-campus", "dream company",
+            "onboarding", "accenture", "honeywell", "epsilon",
+            "tcs", "infosys", "wipro", "cognizant", "capgemini", "deloitte",
+            "google", "microsoft", "amazon", "ibm", "hcl", "techmahindra",
+        ],
+        "General College": [
+            "sport", "sports", "tournament", "event", "events", "competition",
+            "hackathon", "fest", "cultural", "workshop", "club", "contest",
+            "exam", "exams", "schedule", "timetable", "holiday", "notice",
+        ],
+    },
 }
 
 
@@ -42,6 +64,62 @@ def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
         return dict(DEFAULT_CONFIG)
     data = json.loads(path.read_text(encoding="utf-8"))
     return {**DEFAULT_CONFIG, **data}
+
+
+def _tokenize(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def guess_category_bm25(
+    text: str,
+    category_keywords: dict[str, list[str]],
+    *,
+    k1: float = 1.5,
+    b: float = 0.75,
+) -> str | None:
+    """Deterministic category guardrail: BM25-rank each category's keyword list as a
+    'document' against the email text as the 'query'. Returns the top category only
+    when it's unambiguously ahead of the runner-up — otherwise None ("ask the LLM").
+
+    This exists because the LLM classifier alone is inconsistent on genuinely
+    boundary-straddling mail (e.g. a company-run training announcement could read as
+    either Academics or Placements) — a deterministic keyword signal (a company name,
+    "submission", etc.) settles those cases the same way every time.
+    """
+    if not category_keywords:
+        return None
+    docs = {name: _tokenize(" ".join(keywords)) for name, keywords in category_keywords.items()}
+    query_terms = set(_tokenize(text))
+    if not query_terms:
+        return None
+
+    n_docs = len(docs)
+    avg_len = sum(len(d) for d in docs.values()) / n_docs
+    doc_freq: Counter[str] = Counter()
+    for doc in docs.values():
+        doc_freq.update(set(doc))
+
+    scores: dict[str, float] = {}
+    for name, doc in docs.items():
+        term_freq = Counter(doc)
+        doc_len = len(doc)
+        score = 0.0
+        for term in query_terms:
+            f = term_freq.get(term, 0)
+            if f == 0:
+                continue
+            n_t = doc_freq.get(term, 0)
+            idf = math.log((n_docs - n_t + 0.5) / (n_t + 0.5) + 1)
+            score += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * doc_len / avg_len))
+        scores[name] = score
+
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    top_name, top_score = ranked[0]
+    if top_score <= 0:
+        return None
+    if len(ranked) > 1 and ranked[1][1] >= top_score:
+        return None
+    return top_name
 
 
 def _slugify(text: str) -> str:
@@ -180,6 +258,13 @@ def ingest_email(
         if name not in seeded_names
     ]
     classification = classify_email(email, findings, categories)
+
+    search_text = " ".join(
+        [email.get("subject", ""), email.get("from", ""), email.get("body_text", "")]
+    )
+    category_guess = guess_category_bm25(search_text, config.get("category_keywords", {}))
+    if category_guess:
+        classification["category"] = category_guess
 
     cat_title = classification["category"]
     cat_id = f"mail:cat:{_slugify(cat_title)}"
