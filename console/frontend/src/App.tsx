@@ -1,25 +1,20 @@
 import { useEffect, useState } from "react"
 
-import { getHealth, getRoster } from "@/api"
+import { getHealth } from "@/api"
 import { getMailStatus, getMailTree } from "@/lib/brainApi"
 import { Applications } from "@/pages/Applications"
-import { Dashboard } from "@/pages/Dashboard"
-import { MailTree } from "@/pages/MailTree"
-import { Onboard } from "@/pages/Onboard"
+import { Home } from "@/pages/Home"
 import { Profile } from "@/pages/Profile"
 
-export type View = "dashboard" | "applications" | "onboard" | "profile" | "mail"
+export type View = "home" | "profile" | "applications"
 
 const NAV: { view: View; label: string }[] = [
-  { view: "dashboard", label: "Dashboard" },
-  { view: "onboard", label: "Onboard" },
+  { view: "home", label: "Home" },
   { view: "profile", label: "Profile" },
   { view: "applications", label: "Applications" },
-  { view: "mail", label: "Mail tree" },
 ]
 
 interface Rail {
-  people: number
   appsConnected: number
   appsTotal: number
   mailThreads: number | null
@@ -27,10 +22,9 @@ interface Rail {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("dashboard")
+  const [view, setView] = useState<View>("home")
   const [refreshKey, setRefreshKey] = useState(0)
   const [rail, setRail] = useState<Rail>({
-    people: 0,
     appsConnected: 0,
     appsTotal: 0,
     mailThreads: null,
@@ -40,13 +34,12 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
 
-    Promise.all([getRoster(), getHealth(), getMailStatus().catch(() => ({ connected: false }))]).then(
-      ([roster, health, mail]) => {
+    Promise.all([getHealth(), getMailStatus().catch(() => ({ connected: false }))]).then(
+      ([health, mail]) => {
         if (cancelled) return
         const connected = health.integrations.filter((i) => i.status === "configured").length
         setRail((r) => ({
           ...r,
-          people: roster.length,
           appsConnected: connected + (mail.connected ? 1 : 0),
           appsTotal: health.integrations.length + 1,
           mailConnected: mail.connected,
@@ -124,9 +117,6 @@ export default function App() {
 
         <div className="flex flex-wrap gap-x-6 gap-y-1 py-3 font-readout text-[11px] text-muted-foreground">
           <span>
-            PEOPLE <b className="text-foreground">{String(rail.people).padStart(2, "0")}</b>
-          </span>
-          <span>
             APPS{" "}
             <b className="text-foreground">
               {rail.appsConnected}/{rail.appsTotal}
@@ -140,11 +130,9 @@ export default function App() {
       </div>
 
       <main className="mx-auto max-w-5xl px-6 pb-16 pt-4">
-        {view === "dashboard" && <Dashboard onNavigate={setView} rail={rail} />}
+        {view === "home" && <Home rail={rail} onNavigate={setView} />}
         {view === "applications" && <Applications onMailStatusChange={refresh} />}
-        {view === "onboard" && <Onboard onDone={refresh} />}
         {view === "profile" && <Profile />}
-        {view === "mail" && <MailTree mailConnected={rail.mailConnected} />}
       </main>
     </div>
   )

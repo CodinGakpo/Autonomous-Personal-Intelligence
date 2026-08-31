@@ -1,6 +1,7 @@
-import { Loader2, MailX, Network, RefreshCw } from "lucide-react"
+import { Loader2, Mail, MailX, Network, PlugZap, RefreshCw } from "lucide-react"
 import { useState } from "react"
 
+import type { View } from "@/App"
 import { MailChat } from "@/components/MailChat"
 import { MailMindmap } from "@/components/MailMindmap"
 import { Button } from "@/components/ui/button"
@@ -14,28 +15,76 @@ const WINDOW_OPTIONS = [
   { label: "Last 3 hours", minutes: 180 },
 ]
 
-export function MailTree({ mailConnected }: { mailConnected: boolean | null }) {
-  if (mailConnected === false) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <MailX className="h-10 w-10 text-muted-foreground" />
-          <div>
-            <p className="font-medium">Gmail isn't connected</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              The mail tree, reload, and chat are hidden until Gmail is reconnected from the
-              Applications tab.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return <MailTreeContent />
+interface HomeRail {
+  appsConnected: number
+  appsTotal: number
+  mailThreads: number | null
+  mailConnected: boolean | null
 }
 
-function MailTreeContent() {
+export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: View) => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="font-readout text-[11px] font-normal uppercase tracking-widest text-muted-foreground">
+              Applications
+            </CardTitle>
+            <PlugZap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="font-readout text-3xl font-bold tabular-nums">
+              {rail.appsConnected}
+              <span className="text-lg text-muted-foreground"> / {rail.appsTotal}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate("applications")}
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Manage applications
+            </button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="font-readout text-[11px] font-normal uppercase tracking-widest text-muted-foreground">
+              Mail tree
+            </CardTitle>
+            <Mail className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="font-readout text-3xl font-bold tabular-nums">
+              {rail.mailThreads === null ? "—" : rail.mailThreads}
+            </p>
+            <p className="text-sm text-muted-foreground">threads ingested</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {rail.mailConnected === false ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <MailX className="h-10 w-10 text-muted-foreground" />
+            <div>
+              <p className="font-medium">Gmail isn't connected</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The mail tree, reload, and chat are hidden until Gmail is reconnected from the
+                Applications tab.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <MailPanel />
+      )}
+    </div>
+  )
+}
+
+function MailPanel() {
   const [windowMinutes, setWindowMinutes] = useState(WINDOW_OPTIONS[0].minutes)
   const [reloading, setReloading] = useState(false)
   const [reloadResult, setReloadResult] = useState<string | null>(null)
@@ -87,7 +136,7 @@ function MailTreeContent() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle>Mail Tree</CardTitle>
+          <CardTitle>Mail tree</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={windowMinutes}

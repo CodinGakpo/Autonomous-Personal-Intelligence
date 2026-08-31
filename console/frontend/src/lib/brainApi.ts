@@ -48,3 +48,9 @@ export function getMailStatus(): Promise<{ connected: boolean }> {
 export function disconnectMail(): Promise<{ connected: boolean }> {
   return request<{ connected: boolean }>("/api/mail/disconnect", { method: "POST" })
 }
+
+// Opens the OAuth consent browser tab on the machine running this server and blocks until
+// the person finishes (or abandons) it — see brain/viz_server.py's mail_connect().
+export function connectMail(): Promise<{ connected: boolean }> {
+  return request<{ connected: boolean }>("/api/mail/connect", { method: "POST" })
+}

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { disconnectMail, getMailStatus } from "@/lib/brainApi"
+import { connectMail, disconnectMail, getMailStatus } from "@/lib/brainApi"
 
 /**
  * One app, shown as a card with an inline "set up" flow.
@@ -51,6 +51,21 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
     } catch {
       // POST /applications/{id}/connect isn't implemented yet — backend dev's task.
       setNote("Setup endpoint pending — the backend will wire this up.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function connectGmail() {
+    setBusy(true)
+    setNote(null)
+    try {
+      const res = await connectMail()
+      setDone(res.connected)
+      if (!res.connected) setNote("Authorization wasn't completed — try again.")
+      onChanged?.()
+    } catch {
+      setNote("Couldn't reach the mail service — is it running?")
     } finally {
       setBusy(false)
     }
@@ -98,17 +113,29 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
         {id === "gmail" && (
           <p className="text-sm text-muted-foreground">
             {done
-              ? "Reads unread mail into the tree — see the Mail tree tab."
-              : "Reconnect from a terminal: python brain/emailtool.py auth"}
+              ? "Reads unread mail into the tree — see the Home tab."
+              : "Opens a Google sign-in tab to reconnect — no terminal needed."}
           </p>
         )}
-        {!open ? (
+        {id === "gmail" ? (
+          <div className="flex gap-2">
+            {!done && (
+              <Button size="sm" onClick={connectGmail} disabled={busy}>
+                {busy ? "Waiting for authorization…" : "Connect"}
+              </Button>
+            )}
+            {done && (
+              <Button size="sm" variant="ghost" onClick={disconnect} disabled={busy}>
+                {busy ? "Disconnecting…" : "Disconnect"}
+              </Button>
+            )}
+          </div>
+        ) : !open ? (
           <div className="flex gap-2">
             <Button
               size="sm"
               variant={done ? "outline" : "default"}
               onClick={() => setOpen(true)}
-              disabled={id === "gmail"}
             >
               {done ? "Manage" : "Set up"}
             </Button>

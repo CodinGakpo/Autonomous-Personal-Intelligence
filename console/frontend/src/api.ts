@@ -4,23 +4,10 @@ import { type AccessRole, clearToken, getToken } from "@/auth"
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
 // ---------------------------------------------------------------------------
-// DEMO MODE — works entirely in-browser with no backend, and starts with no seeded
-// people or accounts. Onboarding a person during a demo session adds them to this
-// in-memory roster; nothing here persists past a page refresh.
+// DEMO MODE — works entirely in-browser with no backend, and has no seeded accounts.
 // Set VITE_API_BASE_URL to a real server to disable this.
 // ---------------------------------------------------------------------------
 const DEMO_MODE = !import.meta.env.VITE_API_BASE_URL
-
-// Restore _demoEmail from the stored token so a hard-refresh doesn't force re-login.
-function _emailFromToken(): string {
-  try {
-    const t = getToken()
-    if (!t) return ""
-    return JSON.parse(atob(t)).email ?? ""
-  } catch { return "" }
-}
-let _demoEmail = _emailFromToken()
-let _demoRoster: RosterEntry[] = []
 
 function delay(ms = 400) { return new Promise((r) => setTimeout(r, ms)) }
 
@@ -41,20 +28,7 @@ export type OrgRole = "admin" | "team_lead" | "developer" | "intern" | "gtm" | "
 
 export type Product = "product_one" | "product_two" | "product_three"
 
-export interface OnboardRequest {
-  name: string
-  email: string
-  role: OrgRole
-  slack_handle: string
-  products: Product[]
-}
-
-export interface OnboardedPerson extends OnboardRequest {
-  clickup_task_id: string
-  clickup_url: string
-}
-
-// Roster entry returned by GET /roster — sensitive fields may be null for developers.
+// Roster entry returned by GET /roster/me — sensitive fields may be null for developers.
 export interface RosterEntry {
   name: string
   email: string | null         // null when caller is a developer viewing a peer
@@ -174,48 +148,12 @@ export async function getHealth(): Promise<HealthReport> {
   return request<HealthReport>("/health")
 }
 
-export async function getRoster(): Promise<RosterEntry[]> {
-  if (DEMO_MODE) {
-    await delay(300)
-    return _demoRoster.map((p) => ({ ...p, is_own: p.email === _demoEmail }))
-  }
-  return request<RosterEntry[]>("/roster")
-}
-
 export async function getMyProfile(): Promise<RosterEntry> {
   if (DEMO_MODE) {
     await delay(200)
-    const me = _demoRoster.find((p) => p.email === _demoEmail)
-    if (!me) throw new ApiError(404, "Profile not found")
-    return { ...me, is_own: true }
+    throw new ApiError(404, "Profile not found")
   }
   return request<RosterEntry>("/roster/me")
-}
-
-export async function onboard(body: OnboardRequest): Promise<OnboardedPerson> {
-  if (DEMO_MODE) {
-    await delay(600)
-    const person: OnboardedPerson = {
-      ...body,
-      clickup_task_id: `DEMO-${Date.now()}`,
-      clickup_url: "#",
-    }
-    _demoRoster.push({
-      name: body.name,
-      email: body.email,
-      role: body.role,
-      slack_handle: body.slack_handle,
-      products: body.products,
-      clickup_task_id: person.clickup_task_id,
-      clickup_url: person.clickup_url,
-      is_own: false,
-    })
-    return person
-  }
-  return request<OnboardedPerson>("/onboarding", {
-    method: "POST",
-    body: JSON.stringify(body),
-  })
 }
 
 /**
@@ -283,7 +221,7 @@ export const CORE_APPS: Record<string, Omit<Application, "id" | "connected">> = 
 export const GMAIL_APP: Omit<Application, "connected"> = {
   id: "gmail",
   name: "Gmail",
-  description: "Reads unread mail into the knowledge tree (see the Mail Tree tab).",
+  description: "Reads unread mail into the knowledge tree (see the Home tab).",
   kind: "oauth",
 }
 
