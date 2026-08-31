@@ -1,4 +1,4 @@
-import { Loader2, Mail, MailX, Network, PlugZap, RefreshCw } from "lucide-react"
+import { Loader2, Mail, MailX, Map, PlugZap, RefreshCw } from "lucide-react"
 import { useState } from "react"
 
 import type { View } from "@/App"
@@ -28,38 +28,38 @@ export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-readout text-[11px] font-normal uppercase tracking-widest text-muted-foreground">
-              Applications
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Connected apps
             </CardTitle>
             <PlugZap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-readout text-3xl font-bold tabular-nums">
+            <p className="text-3xl font-semibold">
               {rail.appsConnected}
               <span className="text-lg text-muted-foreground"> / {rail.appsTotal}</span>
             </p>
             <button
               type="button"
               onClick={() => onNavigate("applications")}
-              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              className="text-sm text-primary underline-offset-4 hover:underline"
             >
-              Manage applications
+              Manage connected apps
             </button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-readout text-[11px] font-normal uppercase tracking-widest text-muted-foreground">
-              Mail tree
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Your mail
             </CardTitle>
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-readout text-3xl font-bold tabular-nums">
+            <p className="text-3xl font-semibold">
               {rail.mailThreads === null ? "—" : rail.mailThreads}
             </p>
-            <p className="text-sm text-muted-foreground">threads ingested</p>
+            <p className="text-sm text-muted-foreground">conversations organized</p>
           </CardContent>
         </Card>
       </div>
@@ -71,8 +71,7 @@ export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: 
             <div>
               <p className="font-medium">Gmail isn't connected</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                The mail tree, reload, and chat are hidden until Gmail is reconnected from the
-                Applications tab.
+                Connect Gmail from the Connected apps tab to see your mail here.
               </p>
             </div>
           </CardContent>
@@ -101,13 +100,13 @@ function MailPanel() {
     setReloadResult(null)
     try {
       const result = await reloadMail(windowMinutes)
-      setReloadResult(`Processed ${result.processed} email${result.processed === 1 ? "" : "s"}.`)
+      setReloadResult(`Found ${result.processed} new email${result.processed === 1 ? "" : "s"}.`)
       if (showMindmap) {
         const updated = await getMailTree()
         setTree(updated)
       }
     } catch (err) {
-      setReloadError(err instanceof Error ? err.message : "Reload failed.")
+      setReloadError(err instanceof Error ? err.message : "Couldn't check for new mail.")
     } finally {
       setReloading(false)
     }
@@ -126,7 +125,7 @@ function MailPanel() {
       const data = await getMailTree()
       setTree(data)
     } catch (err) {
-      setTreeError(err instanceof Error ? err.message : "Could not load the mail tree.")
+      setTreeError(err instanceof Error ? err.message : "Couldn't load your mail map.")
     } finally {
       setTreeLoading(false)
     }
@@ -136,7 +135,7 @@ function MailPanel() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle>Mail tree</CardTitle>
+          <CardTitle>Your mail</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={windowMinutes}
@@ -155,17 +154,17 @@ function MailPanel() {
               ) : (
                 <RefreshCw className="mr-1 h-4 w-4" />
               )}
-              Reload
+              Check for new mail
             </Button>
             <Button onClick={handleShowMindmap} variant="outline" size="sm">
-              <Network className="mr-1 h-4 w-4" />
-              {showMindmap ? "Hide mindmap" : "Show mindmap"}
+              <Map className="mr-1 h-4 w-4" />
+              {showMindmap ? "Hide mail map" : "View mail map"}
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            A background job also runs every 4 hours automatically. Use Reload to catch up sooner.
+            New mail is also checked automatically every 4 hours.
           </p>
           {reloadResult && <p className="mt-2 text-sm text-primary">{reloadResult}</p>}
           {reloadError && <p className="mt-2 text-sm text-destructive">{reloadError}</p>}
@@ -175,7 +174,7 @@ function MailPanel() {
       {showMindmap && (
         <Card>
           <CardContent className="pt-6">
-            {treeLoading && <p className="text-sm text-muted-foreground">Loading mail tree…</p>}
+            {treeLoading && <p className="text-sm text-muted-foreground">Loading your mail map…</p>}
             {treeError && <p className="text-sm text-destructive">{treeError}</p>}
             {tree && <MailMindmap data={tree} />}
           </CardContent>

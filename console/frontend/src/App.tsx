@@ -11,7 +11,7 @@ export type View = "home" | "profile" | "applications"
 const NAV: { view: View; label: string }[] = [
   { view: "home", label: "Home" },
   { view: "profile", label: "Profile" },
-  { view: "applications", label: "Applications" },
+  { view: "applications", label: "Connected apps" },
 ]
 
 interface Rail {
@@ -68,43 +68,38 @@ export default function App() {
   }, [refreshKey])
 
   const refresh = () => setRefreshKey((k) => k + 1)
-  const systemsNominal = rail.appsConnected > 0
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-5xl px-6 pt-6">
-        <header className="flex flex-wrap items-center justify-between gap-4 pb-4">
+      <div className="mx-auto max-w-3xl px-6 pt-8">
+        <header className="flex flex-wrap items-center justify-between gap-4 pb-6">
           <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary font-readout text-sm font-bold text-primary-foreground">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-base font-semibold text-primary-foreground">
               A
             </span>
-            <div className="flex flex-col leading-none">
-              <span className="font-readout text-sm font-bold tracking-[0.15em] text-foreground">
-                AGENT_OS
-              </span>
-              <span className="mt-0.5 font-readout text-[10px] tracking-[0.2em] text-muted-foreground">
-                OPS CONSOLE
-              </span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-base font-semibold text-foreground">Agent OS</span>
+              <span className="text-sm text-muted-foreground">Ask about your mail and messages</span>
             </div>
           </div>
 
           <div
-            className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 font-readout text-[11px] tracking-wide"
-            style={{ color: systemsNominal ? "var(--primary)" : "var(--caution)" }}
+            className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm"
+            style={{ color: rail.mailConnected ? "#15803d" : "var(--muted-foreground)" }}
           >
-            <span className="status-dot status-dot-live" />
-            <span>{systemsNominal ? "SYSTEMS NOMINAL" : "AWAITING SETUP"}</span>
+            <span className="status-dot" />
+            <span>{rail.mailConnected ? "Gmail connected" : "Gmail not connected"}</span>
           </div>
         </header>
 
-        <nav className="flex gap-5 border-b border-border">
+        <nav className="flex gap-6 border-b border-border">
           {NAV.map((n) => (
             <button
               key={n.view}
               type="button"
               onClick={() => setView(n.view)}
               className={[
-                "relative -mb-px border-b-2 px-0.5 pb-3 font-readout text-[11px] tracking-[0.12em] uppercase transition-colors",
+                "relative -mb-px border-b-2 px-0.5 pb-3 text-sm font-medium transition-colors",
                 view === n.view
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
@@ -114,22 +109,9 @@ export default function App() {
             </button>
           ))}
         </nav>
-
-        <div className="flex flex-wrap gap-x-6 gap-y-1 py-3 font-readout text-[11px] text-muted-foreground">
-          <span>
-            APPS{" "}
-            <b className="text-foreground">
-              {rail.appsConnected}/{rail.appsTotal}
-            </b>
-          </span>
-          <span>
-            MAIL THREADS{" "}
-            <b className="text-foreground">{rail.mailThreads === null ? "—" : rail.mailThreads}</b>
-          </span>
-        </div>
       </div>
 
-      <main className="mx-auto max-w-5xl px-6 pb-16 pt-4">
+      <main className="mx-auto max-w-3xl px-6 pb-16 pt-6">
         {view === "home" && <Home rail={rail} onNavigate={setView} />}
         {view === "applications" && <Applications onMailStatusChange={refresh} />}
         {view === "profile" && <Profile />}

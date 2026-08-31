@@ -70,8 +70,8 @@ export function MailChat() {
       <div className="relative px-5 pb-5 pt-2">
         {noticeVisible && (
           <div className="pointer-events-none absolute inset-x-5 bottom-[calc(100%+0.5rem)] flex justify-center">
-            <div className="pointer-events-auto rounded-full border border-border bg-popover px-3.5 py-1.5 font-readout text-[11px] tracking-wide text-caution shadow-lg">
-              WORK IN PROGRESS — mail Q&A isn't connected yet
+            <div className="pointer-events-auto rounded-full border border-border bg-caution px-3.5 py-1.5 text-sm font-medium text-caution-foreground shadow-lg">
+              Not connected yet — this is a preview
             </div>
           </div>
         )}

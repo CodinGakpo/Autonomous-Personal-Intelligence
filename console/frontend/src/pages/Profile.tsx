@@ -1,107 +1,129 @@
-import { UserCircle2 } from "lucide-react"
+// A free-form list of facts about you, stored in this browser. Once mail Q&A is connected,
+// these are the kind of details it can use to answer questions more personally (e.g. "Timezone"
+// so it knows how to read meeting times, or "Team" so it can tell which mail is relevant).
+import { Plus, Trash2, UserCircle2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { ApiError, type RosterEntry, getMyProfile } from "@/api"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
-type LoadState = "loading" | "empty" | "error" | "ready"
+interface Detail {
+  id: string
+  key: string
+  value: string
+}
+
+const STORAGE_KEY = "agent-os:profile-details"
+
+function loadDetails(): Detail[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as Detail[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveDetails(details: Detail[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(details))
+  } catch {
+    // Private browsing / storage disabled — details just won't persist across visits.
+  }
+}
 
 export function Profile() {
-  const [profile, setProfile] = useState<RosterEntry | null>(null)
-  const [state, setState] = useState<LoadState>("loading")
+  const [details, setDetails] = useState<Detail[]>([])
+  const [newKey, setNewKey] = useState("")
+  const [newValue, setNewValue] = useState("")
 
   useEffect(() => {
-    getMyProfile()
-      .then((p) => {
-        setProfile(p)
-        setState("ready")
-      })
-      .catch((e: unknown) => {
-        // No signed-in identity is matched to a roster entry yet — expected until
-        // onboarding + sign-in are connected, not a failure worth alarming over.
-        setState(e instanceof ApiError && e.status === 404 ? "empty" : "error")
-      })
+    setDetails(loadDetails())
   }, [])
 
-  if (state === "loading") {
-    return <p className="text-sm text-muted-foreground">Loading profile…</p>
+  function update(next: Detail[]) {
+    setDetails(next)
+    saveDetails(next)
   }
 
-  if (state === "empty") {
-    return (
-      <Card className="max-w-lg">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <UserCircle2 className="h-10 w-10 text-muted-foreground" />
-          <div>
-            <p className="font-medium">No profile yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your profile appears here once you're onboarded and signed in.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    )
+  function addDetail() {
+    const key = newKey.trim()
+    const value = newValue.trim()
+    if (!key || !value) return
+    update([...details, { id: crypto.randomUUID(), key, value }])
+    setNewKey("")
+    setNewValue("")
   }
 
-  if (state === "error" || !profile) {
-    return (
-      <p className="text-sm text-destructive">
-        Couldn't load your profile — try again in a moment.
-      </p>
-    )
+  function removeDetail(id: string) {
+    update(details.filter((d) => d.id !== id))
   }
 
   return (
     <Card className="max-w-lg">
       <CardHeader>
-        <CardTitle>{profile.name}</CardTitle>
-        <p className="text-sm text-muted-foreground capitalize">{profile.role.replace("_", " ")}</p>
+        <CardTitle className="flex items-center gap-2">
+          <UserCircle2 className="h-5 w-5 text-muted-foreground" />
+          About you
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Add details you want the assistant to know when it answers your questions — your
+          name, timezone, role, whatever's useful. Only saved on this device.
+        </p>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
-        {profile.email && (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-readout text-xs uppercase tracking-widest text-muted-foreground">
-              Email
-            </span>
-            <span>{profile.email}</span>
-          </div>
+      <CardContent className="flex flex-col gap-4">
+        {details.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            You haven't added anything yet — try "Name", "Timezone", or "Team" below.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {details.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-sm font-medium">{d.key}</span>
+                  <span className="truncate text-sm text-muted-foreground">{d.value}</span>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => removeDetail(d.id)}
+                  aria-label={`Remove ${d.key}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
         )}
-        <div className="flex flex-col gap-0.5">
-          <span className="font-readout text-xs uppercase tracking-widest text-muted-foreground">
-            Slack
-          </span>
-          <span>@{profile.slack_handle}</span>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-input p-3">
+          <div className="flex gap-2">
+            <Input
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              placeholder="Label (e.g. Timezone)"
+              className="w-2/5"
+            />
+            <Input
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addDetail()}
+              placeholder="Detail (e.g. IST, UTC+5:30)"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={addDetail}
+            disabled={!newKey.trim() || !newValue.trim()}
+            className="self-start"
+          >
+            <Plus className="mr-1 h-4 w-4" />
+            Add detail
+          </Button>
         </div>
-        {profile.products.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <span className="font-readout text-xs uppercase tracking-widest text-muted-foreground">
-              Products
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {profile.products.map((p) => (
-                <Badge key={p} variant="outline" className="text-[10px]">
-                  {p.replace("_", " ")}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-        {profile.clickup_url && (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-readout text-xs uppercase tracking-widest text-muted-foreground">
-              ClickUp
-            </span>
-            <a
-              href={profile.clickup_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              Open task ↗
-            </a>
-          </div>
-        )}
       </CardContent>
     </Card>
   )

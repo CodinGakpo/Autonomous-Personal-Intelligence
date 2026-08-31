@@ -1,37 +1,36 @@
-/* Fonts: Inter (body copy) + JetBrains Mono (structural — nav, labels, stat readouts).
-   Font @import must precede the Tailwind import. */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+/* Font @import must precede the Tailwind import. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
-/* "Systems console" design language: this is an ops console for a company run partly by
-   agents, so the UI reads like instrumentation — mono readouts, status-light semantics
-   (teal = live, amber = pending, coral = destructive) — rather than a generic SaaS dashboard.
-   Palette: void #0a0c10, panel #12151b, line #232838, ink #edf0f5, dim #838ba0,
-   signal (primary/live) #4fd1c0, caution (pending) #ffb454, danger #ff5c7a. */
+/* A light, plain-language everyday assistant — not an ops/systems console. One typeface,
+   generous rounding, a friendly blue accent. Optimized for a first-time visitor to understand
+   at a glance, not for density or technical flavor.
+   Palette: page #FAFAF9, card #FFFFFF, ink #1F2328, dim #6B7280,
+   primary (accent) #4C6FFF, caution (pending) #B45309, danger #DC2626. */
 :root {
-  --radius: 0.5rem;
-  --background: #0a0c10;
-  --foreground: #edf0f5;
-  --card: #12151b;
-  --card-foreground: #edf0f5;
-  --popover: #12151b;
-  --popover-foreground: #edf0f5;
-  --primary: #4fd1c0;
-  --primary-foreground: #0a0c10;
-  --secondary: #181c24;
-  --secondary-foreground: #edf0f5;
-  --muted: #14171f;
-  --muted-foreground: #838ba0;
-  --accent: #1b2130;
-  --accent-foreground: #edf0f5;
-  --caution: #ffb454;
-  --caution-foreground: #0a0c10;
-  --destructive: #ff5c7a;
-  --border: #232838;
-  --input: #232838;
-  --ring: #4fd1c0;
+  --radius: 0.75rem;
+  --background: #fafaf9;
+  --foreground: #1f2328;
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+  --primary: #4c6fff;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f2f4;
+  --secondary-foreground: #1f2328;
+  --muted: #f5f5f4;
+  --muted-foreground: #6b7280;
+  --accent: #eef2ff;
+  --accent-foreground: #1f2328;
+  --caution: #fef3c7;
+  --caution-foreground: #92400e;
+  --destructive: #dc2626;
+  --border: #e5e7eb;
+  --input: #d1d5db;
+  --ring: #4c6fff;
 }
 
 @theme inline {
@@ -39,7 +38,6 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -72,17 +70,14 @@
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    background-image: radial-gradient(circle at 1px 1px, rgba(237, 240, 245, 0.035) 1px, transparent 0);
-    background-size: 28px 28px;
   }
 
-  /* Native <select> defaults to the OS's light popup on most platforms, which reads as a
-     white-on-white flash against this dark UI — force the dark surface everywhere it renders,
-     including the closed control and the open option list. */
+  /* Force a consistent light control everywhere <select> renders (closed control and the
+     open option list), instead of leaving it to the OS default. */
   select {
     appearance: none;
     background-color: var(--color-card);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23838ba0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.7rem center;
     padding-right: 2rem;
@@ -95,23 +90,11 @@
 }
 
 @layer utilities {
-  .font-readout {
-    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-  }
   .status-dot {
     display: inline-block;
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 999px;
     background: currentColor;
-    box-shadow: 0 0 6px 1px currentColor;
-  }
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-  }
-  .status-dot-live {
-    animation: pulse-dot 2.2s ease-in-out infinite;
   }
 }

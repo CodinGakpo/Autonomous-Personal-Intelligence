@@ -50,7 +50,7 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
       setOpen(false)
     } catch {
       // POST /applications/{id}/connect isn't implemented yet — backend dev's task.
-      setNote("Setup endpoint pending — the backend will wire this up.")
+      setNote("Connecting this app isn't available yet.")
     } finally {
       setBusy(false)
     }
@@ -84,7 +84,7 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
       }
       onChanged?.()
     } catch {
-      setNote("Disconnect endpoint pending — the backend will wire this up.")
+      setNote("Disconnecting this app isn't available yet.")
     } finally {
       setBusy(false)
     }
@@ -105,16 +105,14 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
         ) : (
           <Badge variant="caution">
             <Clock className="mr-1 h-3 w-3" />
-            Pending
+            Not connected
           </Badge>
         )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {id === "gmail" && (
+        {id === "gmail" && !done && (
           <p className="text-sm text-muted-foreground">
-            {done
-              ? "Reads unread mail into the tree — see the Home tab."
-              : "Opens a Google sign-in tab to reconnect — no terminal needed."}
+            Opens a Google sign-in tab to connect — no terminal needed.
           </p>
         )}
         {id === "gmail" ? (
@@ -160,13 +158,13 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                {name} connects via OAuth — the backend will redirect you to authorise.{" "}
+                You'll be asked to sign in to {name} to connect it.{" "}
                 <ExternalLink className="inline h-3 w-3" />
               </p>
             )}
             <div className="flex gap-2">
               <Button size="sm" onClick={submit} disabled={busy}>
-                {busy ? "Connecting…" : kind === "token" ? "Connect" : "Continue with OAuth"}
+                {busy ? "Connecting…" : "Connect"}
               </Button>
               <Button
                 size="sm"
@@ -224,41 +222,43 @@ export function Applications({ onMailStatusChange }: { onMailStatusChange?: () =
     onMailStatusChange?.()
   }
 
-  // Gmail first — it's the one app that's actually live. The rest come from /health.
-  const core: Application[] = [
+  // Every app in one list, then split by whether it's actually connected — apps move
+  // between sections as their real status changes, instead of a fixed "core" tier.
+  const all: Application[] = [
     { ...GMAIL_APP, connected: gmailConnected },
     ...Object.entries(CORE_APPS).map(([id, meta]) => ({
       id,
       ...meta,
       connected: statuses[id] ?? false,
     })),
+    ...AVAILABLE_APPS,
   ]
+  const connected = all.filter((a) => a.connected)
+  const notConnected = all.filter((a) => !a.connected)
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Plug className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-readout text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Connected apps
-          </h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {core.map((app) => (
-            <AppCard key={app.id} {...app} onChanged={handleChanged} />
-          ))}
-        </div>
-      </section>
+      {connected.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Plug className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">Connected</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {connected.map((app) => (
+              <AppCard key={app.id} {...app} onChanged={handleChanged} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Plus className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-readout text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Connect a new app
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">Add an app</h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {AVAILABLE_APPS.map((app) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {notConnected.map((app) => (
             <AppCard key={app.id} {...app} onChanged={handleChanged} />
           ))}
         </div>

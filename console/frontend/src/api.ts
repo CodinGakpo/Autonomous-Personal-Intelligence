@@ -23,23 +23,6 @@ export interface HealthReport {
   integrations: IntegrationHealth[]
 }
 
-// Org / display roles (what the person does in the company).
-export type OrgRole = "admin" | "team_lead" | "developer" | "intern" | "gtm" | "sales" | "hr"
-
-export type Product = "product_one" | "product_two" | "product_three"
-
-// Roster entry returned by GET /roster/me — sensitive fields may be null for developers.
-export interface RosterEntry {
-  name: string
-  email: string | null         // null when caller is a developer viewing a peer
-  role: OrgRole
-  slack_handle: string
-  products: Product[]
-  clickup_task_id: string | null
-  clickup_url: string | null
-  is_own: boolean              // true when this row is the caller's own entry
-}
-
 export interface UserMe {
   id: number
   email: string
@@ -148,14 +131,6 @@ export async function getHealth(): Promise<HealthReport> {
   return request<HealthReport>("/health")
 }
 
-export async function getMyProfile(): Promise<RosterEntry> {
-  if (DEMO_MODE) {
-    await delay(200)
-    throw new ApiError(404, "Profile not found")
-  }
-  return request<RosterEntry>("/roster/me")
-}
-
 /**
  * Fetch the parsed résumé for an employee.
  * Developers can only fetch their own (backend enforces with 403).
@@ -206,13 +181,12 @@ export interface Application {
   credentialLabel?: string // e.g. "API token" (only for kind === "token")
 }
 
-// The 3 core integrations tracked by the ops backend. Live connected-status comes from
-// getHealth(); this is just the display metadata. BACKEND: fold these into GET /applications
-// when you build it.
+// Integrations tracked by the ops backend. Live connected-status comes from getHealth();
+// this is just the display metadata. BACKEND: fold these into GET /applications when you
+// build it.
 export const CORE_APPS: Record<string, Omit<Application, "id" | "connected">> = {
-  clickup: { name: "ClickUp", description: "Create tasks and record meeting minutes.", kind: "token", credentialLabel: "API token" },
-  slack: { name: "Slack", description: "Notifications and the Hermes agent gateway.", kind: "oauth" },
-  fathom: { name: "Fathom", description: "Fetch meeting transcripts.", kind: "token", credentialLabel: "API key" },
+  clickup: { name: "ClickUp", description: "Keep track of tasks and to-dos.", kind: "token", credentialLabel: "API token" },
+  slack: { name: "Slack", description: "Read and reply to your Slack messages.", kind: "oauth" },
 }
 
 // Gmail is wired up separately from this backend (see brain/emailtool.py's OAuth flow, not
@@ -221,16 +195,15 @@ export const CORE_APPS: Record<string, Omit<Application, "id" | "connected">> = 
 export const GMAIL_APP: Omit<Application, "connected"> = {
   id: "gmail",
   name: "Gmail",
-  description: "Reads unread mail into the knowledge tree (see the Home tab).",
+  description: "Reads your unread mail so you can ask about it. See the Home tab.",
   kind: "oauth",
 }
 
-// Additional apps HR can connect. BACKEND: this hardcoded catalog is a placeholder — replace
+// Additional apps you can connect. BACKEND: this hardcoded catalog is a placeholder — replace
 // with GET /applications once that endpoint exists. Each needs a matching connect handler.
 export const AVAILABLE_APPS: Application[] = [
-  { id: "google_calendar", name: "Google Calendar", description: "Auto-detect meetings to capture.", connected: false, kind: "oauth" },
-  { id: "notion", name: "Notion", description: "Sync docs and the knowledge base.", connected: false, kind: "token", credentialLabel: "Integration token" },
-  { id: "hubspot", name: "HubSpot", description: "Sync CRM contacts and deals.", connected: false, kind: "token", credentialLabel: "Private app token" },
+  { id: "google_calendar", name: "Google Calendar", description: "See what's on your calendar.", connected: false, kind: "oauth" },
+  { id: "notion", name: "Notion", description: "Search your notes and docs.", connected: false, kind: "token", credentialLabel: "Integration token" },
 ]
 
 // BACKEND TODO: implement POST /applications/{id}/connect (see the block above).
