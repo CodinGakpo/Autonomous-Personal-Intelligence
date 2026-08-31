@@ -12,6 +12,7 @@ The `/api/data` endpoint is reusable — the console can call it later to render
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import uuid
@@ -19,14 +20,25 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from brain import ask, ingest, store
+from brain import ask, ingest, mail_ingest, store
+from brain.emailtool import _token_path
 from brain.notify import notify
 
 app = FastAPI(title="Agent OS Brain - Viz")
 HERE = Path(__file__).resolve().parent
+
+# Lets the console frontend (a separate Vite dev server / origin) call this API directly.
+_origins = os.environ.get("BRAIN_CORS_ORIGINS", "http://localhost:5173").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _origins if o.strip()],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _fit(radar: dict[str, Any]) -> int | None:
@@ -171,6 +183,37 @@ def mail_tree() -> dict[str, Any]:
         "type": "root",
         "children": [_mail_node(conn, c) for c in categories],
     }
+
+
+class MailReloadRequest(BaseModel):
+    since_minutes: int
+
+
+@app.post("/api/mail/reload")
+def mail_reload(body: MailReloadRequest) -> dict[str, Any]:
+    """Ingest unread mail from the last `since_minutes` minutes into the tree."""
+    results = mail_ingest.run(since_minutes=body.since_minutes)
+    return {"processed": len(results), "results": results}
+
+
+@app.get("/api/mail/status")
+def mail_status() -> dict[str, Any]:
+    """Whether the mailbox has valid credentials cached (app password or an OAuth token)."""
+    connected = bool(os.environ.get("EMAIL_APP_PASSWORD")) or _token_path().exists()
+    return {"connected": connected}
+
+
+@app.post("/api/mail/disconnect")
+def mail_disconnect() -> dict[str, Any]:
+    """Revoke the cached OAuth token so the mailbox needs `emailtool.py auth` again.
+
+    Only affects the OAuth token cache — if EMAIL_APP_PASSWORD is set, that login path is
+    unaffected (there's nothing to revoke locally for it).
+    """
+    token_path = _token_path()
+    if token_path.exists():
+        token_path.unlink()
+    return {"connected": mail_status()["connected"]}
 
 
 @app.get("/mail-tree")

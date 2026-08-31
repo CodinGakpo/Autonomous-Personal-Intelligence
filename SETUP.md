@@ -54,6 +54,36 @@ password if the provider doesn't require one) plus that provider's IMAP host
 The pipeline only ever reads **unread** mail and marks an email read after it's successfully
 filed into the tree — it never deletes or modifies anything else in your inbox.
 
+### If App Passwords aren't available
+
+Some Google accounts (Advanced Protection, or newer account cohorts) don't offer App
+Passwords at all — `myaccount.google.com/apppasswords` shows "The setting you are looking for
+is not available for your account." If that's you, leave `EMAIL_APP_PASSWORD` unset and use
+OAuth instead. The rest of `emailtool.py` (IMAP fetch/parse, marking read) is unchanged — only
+the login step differs.
+
+1. Sign into [Google Cloud Console](https://console.cloud.google.com) with the same account as
+   `EMAIL_EMAIL` — this keeps the project owner and the OAuth test user the same account and
+   avoids a class of confusing permission errors.
+2. **New Project** → name it anything (e.g. `hermes-mail`).
+3. **APIs & Services → OAuth consent screen** → User Type **External** → fill in an app name,
+   support email, developer email.
+4. On the **Scopes** step, add `https://mail.google.com/` — not `gmail.readonly`. IMAP OAuth
+   needs full-mailbox access, and the pipeline needs write access to mark messages read (that's
+   how it avoids reprocessing the same email); `gmail.readonly` can't do either and doesn't
+   even work over IMAP (it's a Gmail-REST-API-only scope).
+5. On **Test users**, add your own email — skipping this gives you `access_denied` at consent
+   with no useful explanation.
+6. **Credentials → Create Credentials → OAuth client ID → Desktop app → Create → Download JSON**.
+7. Save it as `~/.hermes/mail/credentials.json` (or set `GMAIL_CREDENTIALS_PATH` in `.env` to
+   wherever you saved it).
+8. Run the one-time interactive consent (opens a browser):
+   ```bash
+   uv run python brain/emailtool.py auth
+   ```
+   This caches a refresh token at `~/.hermes/mail/token.json` (or `GMAIL_TOKEN_PATH`) — later
+   runs of `list` / `mark-read` reuse it silently, no browser needed.
+
 ## 5. OpenRouter setup
 
 1. Sign up at [openrouter.ai](https://openrouter.ai) and generate one or more **free-tier** API

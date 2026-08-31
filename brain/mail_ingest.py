@@ -352,11 +352,14 @@ def ingest_email(
 EMAILTOOL = Path(__file__).resolve().parent / "emailtool.py"
 
 
-def fetch_unread_emails() -> list[dict[str, Any]]:
+def fetch_unread_emails(since_minutes: int | None = None) -> list[dict[str, Any]]:
     """Run emailtool.py list; return the parsed unread-email list."""
+    cmd = [sys.executable, str(EMAILTOOL), "list"]
+    if since_minutes is not None:
+        cmd += ["--since-minutes", str(since_minutes)]
     proc = subprocess.run(
-        [sys.executable, str(EMAILTOOL), "list"],
-        capture_output=True, text=True, encoding="utf-8", timeout=120,
+        cmd,
+        capture_output=True, text=True, encoding="utf-8", timeout=600,
     )
     if proc.returncode != 0:
         raise SystemExit(f"emailtool.py list failed: {proc.stderr.strip()}")
@@ -373,7 +376,7 @@ def mark_email_read(uid: str) -> None:
         raise SystemExit(f"emailtool.py mark-read failed: {proc.stderr.strip()}")
 
 
-def run(conn: Any = None) -> list[dict[str, Any]]:
+def run(conn: Any = None, since_minutes: int | None = None) -> list[dict[str, Any]]:
     """Fetch unread mail, ingest each into the tree, mark read only on success."""
     conn = conn or store.connect()
     config = load_config()
@@ -383,7 +386,7 @@ def run(conn: Any = None) -> list[dict[str, Any]]:
         config["resume_profile"] = parse_resume(Path(config["resume_path"]))
 
     results = []
-    for email in fetch_unread_emails():
+    for email in fetch_unread_emails(since_minutes):
         try:
             result = ingest_email(conn, email, config)
             mark_email_read(email["uid"])
@@ -395,10 +398,18 @@ def run(conn: Any = None) -> list[dict[str, Any]]:
 
 
 def main() -> None:
+    usage = "usage: python -m brain.mail_ingest run [--since-minutes N]"
     if len(sys.argv) < 2 or sys.argv[1] != "run":
-        print("usage: python -m brain.mail_ingest run", file=sys.stderr)
+        print(usage, file=sys.stderr)
         sys.exit(2)
-    for result in run():
+    since_minutes = None
+    if "--since-minutes" in sys.argv:
+        idx = sys.argv.index("--since-minutes")
+        if idx + 1 >= len(sys.argv):
+            print(usage, file=sys.stderr)
+            sys.exit(2)
+        since_minutes = int(sys.argv[idx + 1])
+    for result in run(since_minutes=since_minutes):
         if "error" in result:
             print(f"[error] uid {result['uid']}: {result['error']}")
         else:

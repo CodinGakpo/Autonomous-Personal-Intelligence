@@ -192,7 +192,7 @@ def test_run_marks_read_only_on_success(monkeypatch, tmp_path):
     conn = _conn(tmp_path)
     monkeypatch.setattr(
         mail_ingest, "fetch_unread_emails",
-        lambda: [_email(uid="1"), _email(uid="2", subject="bad")],
+        lambda since_minutes=None: [_email(uid="1"), _email(uid="2", subject="bad")],
     )
 
     def fake_ingest(conn_, email, config):
@@ -219,7 +219,7 @@ def test_run_marks_read_failure_does_not_abort_batch(monkeypatch, tmp_path):
     conn = _conn(tmp_path)
     monkeypatch.setattr(
         mail_ingest, "fetch_unread_emails",
-        lambda: [_email(uid="1"), _email(uid="2", subject="second")],
+        lambda since_minutes=None: [_email(uid="1"), _email(uid="2", subject="second")],
     )
 
     def fake_ingest(conn_, email, config):

@@ -16,6 +16,8 @@ dependencies = [
     "python-multipart>=0.0.32",
     "python-dotenv>=1.2.2",
     "slack-bolt>=1.29.0",
+    "google-auth>=2.35",
+    "google-auth-oauthlib>=1.2",
 ]
 
 [dependency-groups]
