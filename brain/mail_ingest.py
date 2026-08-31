@@ -16,15 +16,13 @@ Usage:
 from __future__ import annotations
 
 import json
-import math
 import re
 import subprocess
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from brain import store
+from brain import bm25, store
 from brain.mail_attachments import process_attachment
 from brain.openrouter import call_openrouter
 
@@ -66,10 +64,6 @@ def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
     return {**DEFAULT_CONFIG, **data}
 
 
-def _tokenize(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", (text or "").lower())
-
-
 def guess_category_bm25(
     text: str,
     category_keywords: dict[str, list[str]],
@@ -88,32 +82,8 @@ def guess_category_bm25(
     """
     if not category_keywords:
         return None
-    docs = {name: _tokenize(" ".join(keywords)) for name, keywords in category_keywords.items()}
-    query_terms = set(_tokenize(text))
-    if not query_terms:
-        return None
-
-    n_docs = len(docs)
-    avg_len = sum(len(d) for d in docs.values()) / n_docs
-    doc_freq: Counter[str] = Counter()
-    for doc in docs.values():
-        doc_freq.update(set(doc))
-
-    scores: dict[str, float] = {}
-    for name, doc in docs.items():
-        term_freq = Counter(doc)
-        doc_len = len(doc)
-        score = 0.0
-        for term in query_terms:
-            f = term_freq.get(term, 0)
-            if f == 0:
-                continue
-            n_t = doc_freq.get(term, 0)
-            idf = math.log((n_docs - n_t + 0.5) / (n_t + 0.5) + 1)
-            score += idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * doc_len / avg_len))
-        scores[name] = score
-
-    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    documents = {name: " ".join(keywords) for name, keywords in category_keywords.items()}
+    ranked = bm25.rank(text, documents, k1=k1, b=b)
     top_name, top_score = ranked[0]
     if top_score <= 0:
         return None

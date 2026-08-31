@@ -1,8 +1,12 @@
-// UI-only chat panel styled after Claude's chat screen: plain message text (no bubble noise),
-// generous spacing, a pill-shaped composer pinned to the bottom. Sending isn't wired to a
-// backend yet — it just surfaces a "work in progress" notice next to the composer.
+// Chat panel styled after Claude's chat screen: plain text for assistant messages, a
+// rounded bubble for user messages, a pill-shaped composer pinned to the bottom. Sends real
+// questions to brain/viz_server.py's /api/mail/ask, folding in the "About you" details from
+// the Profile page as light personal context.
 import { ArrowUp } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+
+import { askMail } from "@/lib/brainApi"
+import { loadProfileDetails } from "@/lib/profileDetails"
 
 interface ChatMessage {
   id: number
@@ -13,32 +17,39 @@ interface ChatMessage {
 export function MailChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
-  const [noticeVisible, setNoticeVisible] = useState(false)
+  const [pending, setPending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
-  }, [messages])
+  }, [messages, pending])
 
-  useEffect(() => {
-    if (!noticeVisible) return
-    const t = setTimeout(() => setNoticeVisible(false), 2600)
-    return () => clearTimeout(t)
-  }, [noticeVisible])
-
-  function send() {
+  async function send() {
     const text = input.trim()
-    if (!text) return
+    if (!text || pending) return
     setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: text }])
     setInput("")
-    setNoticeVisible(true)
+    setPending(true)
+    try {
+      const details = loadProfileDetails().map(({ key, value }) => ({ key, value }))
+      const { answer } = await askMail(text, details)
+      setMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", content: answer }])
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Something went wrong."
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now() + 1, role: "assistant", content: `Couldn't get an answer: ${detail}` },
+      ])
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
     <div className="relative flex h-[640px] w-full flex-col overflow-hidden rounded-xl border bg-card">
       <div className="border-b px-5 py-3">
         <p className="text-sm font-medium">Ask about your mail</p>
-        <p className="text-xs text-muted-foreground">UI preview — answering isn't connected yet</p>
+        <p className="text-xs text-muted-foreground">Answers use your ingested mail</p>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6">
@@ -63,18 +74,18 @@ export function MailChat() {
                 </div>
               </div>
             ))}
+            {pending && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] text-sm leading-relaxed text-muted-foreground">
+                  Thinking…
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       <div className="relative px-5 pb-5 pt-2">
-        {noticeVisible && (
-          <div className="pointer-events-none absolute inset-x-5 bottom-[calc(100%+0.5rem)] flex justify-center">
-            <div className="pointer-events-auto rounded-full border border-border bg-caution px-3.5 py-1.5 text-sm font-medium text-caution-foreground shadow-lg">
-              Not connected yet — this is a preview
-            </div>
-          </div>
-        )}
         <div className="flex items-end gap-2 rounded-3xl border border-input bg-background px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
           <textarea
             value={input}
@@ -92,7 +103,7 @@ export function MailChat() {
           <button
             type="button"
             onClick={send}
-            disabled={!input.trim()}
+            disabled={!input.trim() || pending}
             aria-label="Send"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
           >

@@ -54,3 +54,22 @@ export function disconnectMail(): Promise<{ connected: boolean }> {
 export function connectMail(): Promise<{ connected: boolean }> {
   return request<{ connected: boolean }>("/api/mail/connect", { method: "POST" })
 }
+
+export interface MailAskProfileDetail {
+  key: string
+  value: string
+}
+
+export interface MailAskResponse {
+  answer: string
+}
+
+export function askMail(
+  question: string,
+  profileDetails: MailAskProfileDetail[],
+): Promise<MailAskResponse> {
+  return request<MailAskResponse>("/api/mail/ask", {
+    method: "POST",
+    body: JSON.stringify({ question, profile_details: profileDetails }),
+  })
+}

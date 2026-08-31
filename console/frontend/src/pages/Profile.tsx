@@ -1,37 +1,17 @@
-// A free-form list of facts about you, stored in this browser. Once mail Q&A is connected,
-// these are the kind of details it can use to answer questions more personally (e.g. "Timezone"
-// so it knows how to read meeting times, or "Team" so it can tell which mail is relevant).
+// A free-form list of facts about you, stored in this browser. Mail Q&A folds these into
+// its prompt as light personal context (e.g. "Timezone" so it knows how to read meeting
+// times, or "Team" so it can tell which mail is relevant) — see components/MailChat.tsx.
 import { Plus, Trash2, UserCircle2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-
-interface Detail {
-  id: string
-  key: string
-  value: string
-}
-
-const STORAGE_KEY = "agent-os:profile-details"
-
-function loadDetails(): Detail[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Detail[]) : []
-  } catch {
-    return []
-  }
-}
-
-function saveDetails(details: Detail[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(details))
-  } catch {
-    // Private browsing / storage disabled — details just won't persist across visits.
-  }
-}
+import {
+  type ProfileDetail as Detail,
+  loadProfileDetails as loadDetails,
+  saveProfileDetails as saveDetails,
+} from "@/lib/profileDetails"
 
 export function Profile() {
   const [details, setDetails] = useState<Detail[]>([])

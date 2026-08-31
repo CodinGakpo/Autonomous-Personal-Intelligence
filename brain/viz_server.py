@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from brain import ask, ingest, mail_ingest, store
+from brain import ask, ingest, mail_ask, mail_ingest, store
 from brain.emailtool import _load_oauth_credentials, _token_path
 from brain.notify import notify
 
@@ -227,6 +227,29 @@ def mail_connect() -> dict[str, Any]:
     """
     _load_oauth_credentials(interactive=True)
     return {"connected": mail_status()["connected"]}
+
+
+class ProfileDetail(BaseModel):
+    key: str
+    value: str
+
+
+class MailAskRequest(BaseModel):
+    question: str
+    profile_details: list[ProfileDetail] = []
+
+
+@app.post("/api/mail/ask")
+def mail_ask_endpoint(body: MailAskRequest) -> Any:
+    """Natural-language question over the ingested mail tree -> plain-text answer."""
+    conn = store.connect()
+    details = [d.model_dump() for d in body.profile_details]
+    try:
+        return mail_ask.ask_mail(conn, body.question, details)
+    except SystemExit as exc:
+        # call_openrouter raises SystemExit when every OPENROUTER_API_KEYS entry is
+        # exhausted/rejected.
+        return JSONResponse(status_code=502, content={"error": str(exc)})
 
 
 @app.get("/mail-tree")
