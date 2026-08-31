@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from brain import ask, ingest, mail_ingest, store
-from brain.emailtool import _token_path
+from brain.emailtool import _load_oauth_credentials, _token_path
 from brain.notify import notify
 
 app = FastAPI(title="Agent OS Brain - Viz")
@@ -205,7 +205,7 @@ def mail_status() -> dict[str, Any]:
 
 @app.post("/api/mail/disconnect")
 def mail_disconnect() -> dict[str, Any]:
-    """Revoke the cached OAuth token so the mailbox needs `emailtool.py auth` again.
+    """Revoke the cached OAuth token so the mailbox needs to be reconnected.
 
     Only affects the OAuth token cache — if EMAIL_APP_PASSWORD is set, that login path is
     unaffected (there's nothing to revoke locally for it).
@@ -213,6 +213,19 @@ def mail_disconnect() -> dict[str, Any]:
     token_path = _token_path()
     if token_path.exists():
         token_path.unlink()
+    return {"connected": mail_status()["connected"]}
+
+
+@app.post("/api/mail/connect")
+def mail_connect() -> dict[str, Any]:
+    """Run the interactive OAuth consent flow and cache the resulting token.
+
+    This server and the browser hitting it are on the same machine (local dev), so opening
+    the consent page here — the same thing `emailtool.py auth` does from a terminal — reaches
+    the person clicking "Connect" without them needing a terminal at all. Blocks until they
+    complete (or abandon) the browser consent flow.
+    """
+    _load_oauth_credentials(interactive=True)
     return {"connected": mail_status()["connected"]}
 
 
