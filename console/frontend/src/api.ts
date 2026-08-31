@@ -4,36 +4,13 @@ import { type AccessRole, clearToken, getToken } from "@/auth"
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 
 // ---------------------------------------------------------------------------
-// DEMO MODE — works entirely in-browser with no backend.
+// DEMO MODE — works entirely in-browser with no backend, and starts with no seeded
+// people or accounts. Onboarding a person during a demo session adds them to this
+// in-memory roster; nothing here persists past a page refresh.
 // Set VITE_API_BASE_URL to a real server to disable this.
 // ---------------------------------------------------------------------------
 const DEMO_MODE = !import.meta.env.VITE_API_BASE_URL
 
-const DEMO_USERS: Record<string, { password: string; role: AccessRole }> = {
-  "fenil@agent-os.local":      { password: "demo", role: "admin" },
-  "usman@agent-os.local":      { password: "demo", role: "admin" },
-  "manikandan@agent-os.local": { password: "demo", role: "team_lead" },
-  "hirak@agent-os.local":      { password: "demo", role: "developer" },
-  "sajal@agent-os.local":      { password: "demo", role: "developer" },
-  "pruthvik@agent-os.local":   { password: "demo", role: "developer" },
-  "ayush@agent-os.local":      { password: "demo", role: "developer" },
-  "sudeep@agent-os.local":     { password: "demo", role: "developer" },
-  "yogesh@agent-os.local":     { password: "demo", role: "developer" },
-}
-
-const DEMO_ROSTER: RosterEntry[] = [
-  { name: "Fenil",      email: "fenil@agent-os.local",      role: "admin",     slack_handle: "fenil",      products: ["product_one"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Usman",      email: "usman@agent-os.local",      role: "admin",     slack_handle: "usman",      products: ["product_two"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Manikandan", email: "manikandan@agent-os.local", role: "team_lead", slack_handle: "manikandan", products: ["product_one", "product_two"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Hirak",      email: "hirak@agent-os.local",      role: "developer", slack_handle: "hirak",      products: ["product_one"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Sajal",      email: "sajal@agent-os.local",      role: "developer", slack_handle: "sajal",      products: ["product_two"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Pruthvik",   email: "pruthvik@agent-os.local",   role: "developer", slack_handle: "pruthvik",   products: ["product_three"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Ayush",      email: "ayush@agent-os.local",      role: "developer", slack_handle: "ayush",      products: ["product_one"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Sudeep",     email: "sudeep@agent-os.local",     role: "developer", slack_handle: "sudeep",     products: ["product_two"], clickup_task_id: null, clickup_url: null, is_own: false },
-  { name: "Yogesh",     email: "yogesh@agent-os.local",     role: "developer", slack_handle: "yogesh",     products: ["product_three"], clickup_task_id: null, clickup_url: null, is_own: false },
-]
-
-// Mutable in-session state for demo (resets on page refresh).
 // Restore _demoEmail from the stored token so a hard-refresh doesn't force re-login.
 function _emailFromToken(): string {
   try {
@@ -43,7 +20,7 @@ function _emailFromToken(): string {
   } catch { return "" }
 }
 let _demoEmail = _emailFromToken()
-let _demoRoster = [...DEMO_ROSTER]
+let _demoRoster: RosterEntry[] = []
 
 function delay(ms = 400) { return new Promise((r) => setTimeout(r, ms)) }
 
@@ -58,9 +35,6 @@ export interface HealthReport {
   ok: boolean
   integrations: IntegrationHealth[]
 }
-
-// Access roles (ADR-0003).
-export type AccessRole = "admin" | "team_lead" | "developer" | "hr"
 
 // Org / display roles (what the person does in the company).
 export type OrgRole = "admin" | "team_lead" | "developer" | "intern" | "gtm" | "sales" | "hr"
@@ -166,11 +140,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export async function login(email: string, password: string): Promise<string> {
   if (DEMO_MODE) {
     await delay()
-    const user = DEMO_USERS[email.toLowerCase()]
-    if (!user || user.password !== password) throw new ApiError(401, "Invalid credentials")
-    _demoEmail = email.toLowerCase()
-    // Fake JWT-like token so the app's token-presence checks pass.
-    return btoa(JSON.stringify({ email, role: user.role }))
+    // No seeded accounts in demo mode — point VITE_API_BASE_URL at a real backend to sign in.
+    throw new ApiError(401, "Sign-in needs a connected backend (set VITE_API_BASE_URL).")
   }
   const data = await request<{ token: string }>("/auth/login", {
     method: "POST",
@@ -182,9 +153,7 @@ export async function login(email: string, password: string): Promise<string> {
 export async function getMe(): Promise<UserMe> {
   if (DEMO_MODE) {
     await delay(200)
-    const user = DEMO_USERS[_demoEmail]
-    if (!user) throw new ApiError(401, "Not authenticated")
-    return { id: 1, email: _demoEmail, role: user.role }
+    throw new ApiError(401, "Not authenticated")
   }
   return request<UserMe>("/auth/me")
 }
@@ -192,11 +161,12 @@ export async function getMe(): Promise<UserMe> {
 export async function getHealth(): Promise<HealthReport> {
   if (DEMO_MODE) {
     await delay(300)
+    // Nothing is actually connected until you set the real tokens (see SETUP.md).
     return {
-      ok: true,
+      ok: false,
       integrations: [
-        { name: "clickup", status: "configured" },
-        { name: "slack",   status: "configured" },
+        { name: "clickup", status: "not_configured" },
+        { name: "slack",   status: "not_configured" },
         { name: "fathom",  status: "not_configured" },
       ],
     }
@@ -298,19 +268,29 @@ export interface Application {
   credentialLabel?: string // e.g. "API token" (only for kind === "token")
 }
 
-// The 3 core integrations. Live connected-status comes from getHealth(); this is just the
-// display metadata. BACKEND: fold these into GET /applications when you build it.
+// The 3 core integrations tracked by the ops backend. Live connected-status comes from
+// getHealth(); this is just the display metadata. BACKEND: fold these into GET /applications
+// when you build it.
 export const CORE_APPS: Record<string, Omit<Application, "id" | "connected">> = {
   clickup: { name: "ClickUp", description: "Create tasks and record meeting minutes.", kind: "token", credentialLabel: "API token" },
   slack: { name: "Slack", description: "Notifications and the Hermes agent gateway.", kind: "oauth" },
   fathom: { name: "Fathom", description: "Fetch meeting transcripts.", kind: "token", credentialLabel: "API key" },
 }
 
+// Gmail is wired up separately from this backend (see brain/emailtool.py's OAuth flow, not
+// this backend's /health) — its live connected state comes from brainApi.getMailStatus(),
+// not from here. `connected: false` is just the fallback before that status loads.
+export const GMAIL_APP: Omit<Application, "connected"> = {
+  id: "gmail",
+  name: "Gmail",
+  description: "Reads unread mail into the knowledge tree (see the Mail Tree tab).",
+  kind: "oauth",
+}
+
 // Additional apps HR can connect. BACKEND: this hardcoded catalog is a placeholder — replace
 // with GET /applications once that endpoint exists. Each needs a matching connect handler.
 export const AVAILABLE_APPS: Application[] = [
   { id: "google_calendar", name: "Google Calendar", description: "Auto-detect meetings to capture.", connected: false, kind: "oauth" },
-  { id: "gmail", name: "Gmail", description: "Summarise and triage important email.", connected: false, kind: "oauth" },
   { id: "notion", name: "Notion", description: "Sync docs and the knowledge base.", connected: false, kind: "token", credentialLabel: "Integration token" },
   { id: "hubspot", name: "HubSpot", description: "Sync CRM contacts and deals.", connected: false, kind: "token", credentialLabel: "Private app token" },
 ]
@@ -329,42 +309,4 @@ export function disconnectApp(id: string): Promise<void> {
   return request<void>(`/applications/${id}/disconnect`, { method: "POST" })
 }
 
-// ===========================================================================
-// Slack ID management — HR can assign / update a roster member's Slack handle.
-//
-// ⚠️  BACKEND DEV: the endpoint below DOES NOT EXIST YET.
-// Please implement:
-//
-//   PATCH /roster/{email}/slack
-//     body: { slack_handle: string }
-//     → validate the employee exists in the roster, update their `slack_handle`
-//       both in the in-memory cache and in ClickUp (task description field).
-//       Require admin / team_lead / hr role (same as POST /onboarding).
-//     → return 200 + the updated RosterEntry.
-//
-// This value is what the Hermes agent reads to route Slack messages to the
-// right person; keeping it accurate is critical for agent operations.
-// ===========================================================================
-
-export interface UpdateSlackHandleRequest {
-  slack_handle: string
-}
-
-// BACKEND TODO: implement PATCH /roster/{email}/slack (see the block above).
-export async function updateSlackHandle(
-  email: string,
-  body: UpdateSlackHandleRequest,
-): Promise<RosterEntry> {
-  if (DEMO_MODE) {
-    await delay(500)
-    const entry = _demoRoster.find((p) => p.email === email)
-    if (!entry) throw new ApiError(404, `Employee ${email} not found.`)
-    entry.slack_handle = body.slack_handle
-    return { ...entry, is_own: entry.email === _demoEmail }
-  }
-  return request<RosterEntry>(`/roster/${encodeURIComponent(email)}/slack`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  })
-}
 

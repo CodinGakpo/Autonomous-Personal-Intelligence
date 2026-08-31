@@ -1,7 +1,7 @@
-import { Check, ExternalLink, Plug, Plus } from "lucide-react"
+import { Check, Clock, ExternalLink, Plug, Plus } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { type Application, AVAILABLE_APPS, CORE_APPS, connectApp, getHealth } from "@/api"
+import { type Application, AVAILABLE_APPS, CORE_APPS, GMAIL_APP, connectApp, disconnectApp, getHealth } from "@/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { disconnectMail, getMailStatus } from "@/lib/brainApi"
 
 /**
  * One app, shown as a card with an inline "set up" flow.
@@ -22,13 +23,18 @@ import { Label } from "@/components/ui/label"
  * call 404s and we surface a "pending backend" note (so the page still demos). Once the
  * endpoint is live, a token app stores the secret + flips to Connected; an OAuth app
  * returns { authUrl } and we redirect the browser to start the OAuth flow.
+ *
+ * Gmail is the exception: it's connected through a separate service (brain/emailtool.py),
+ * so its disconnect actually works today — it revokes the cached OAuth token.
  */
-function AppCard({ id, name, description, connected, kind, credentialLabel }: Application) {
+function AppCard({ id, name, description, connected, kind, credentialLabel, onChanged }: Application & { onChanged?: () => void }) {
   const [open, setOpen] = useState(false)
   const [credential, setCredential] = useState("")
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [done, setDone] = useState(connected)
+
+  useEffect(() => setDone(connected), [connected])
 
   async function submit() {
     setBusy(true)
@@ -50,6 +56,25 @@ function AppCard({ id, name, description, connected, kind, credentialLabel }: Ap
     }
   }
 
+  async function disconnect() {
+    setBusy(true)
+    setNote(null)
+    try {
+      if (id === "gmail") {
+        const res = await disconnectMail()
+        setDone(res.connected)
+      } else {
+        await disconnectApp(id)
+        setDone(false)
+      }
+      onChanged?.()
+    } catch {
+      setNote("Disconnect endpoint pending — the backend will wire this up.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3">
@@ -63,18 +88,36 @@ function AppCard({ id, name, description, connected, kind, credentialLabel }: Ap
             Connected
           </Badge>
         ) : (
-          <Badge variant="secondary">Not connected</Badge>
+          <Badge variant="caution">
+            <Clock className="mr-1 h-3 w-3" />
+            Pending
+          </Badge>
         )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {id === "gmail" && (
+          <p className="text-sm text-muted-foreground">
+            {done
+              ? "Reads unread mail into the tree — see the Mail tree tab."
+              : "Reconnect from a terminal: python brain/emailtool.py auth"}
+          </p>
+        )}
         {!open ? (
-          <Button
-            size="sm"
-            variant={done ? "outline" : "default"}
-            onClick={() => setOpen(true)}
-          >
-            {done ? "Manage" : "Set up"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={done ? "outline" : "default"}
+              onClick={() => setOpen(true)}
+              disabled={id === "gmail"}
+            >
+              {done ? "Manage" : "Set up"}
+            </Button>
+            {done && (
+              <Button size="sm" variant="ghost" onClick={disconnect} disabled={busy}>
+                {busy ? "Disconnecting…" : "Disconnect"}
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-2 rounded-md border border-input p-3">
             {kind === "token" ? (
@@ -109,24 +152,25 @@ function AppCard({ id, name, description, connected, kind, credentialLabel }: Ap
                 Cancel
               </Button>
             </div>
-            {note && <p className="text-sm text-muted-foreground">{note}</p>}
           </div>
         )}
+        {note && <p className="text-sm text-muted-foreground">{note}</p>}
       </CardContent>
     </Card>
   )
 }
 
 /**
- * Applications page (renamed from "Health"): shows the integrations and lets HR set them up.
+ * Applications page: shows every integration and lets you set up or disconnect it.
  *
  * BACKEND DEV: live connected-status for the 3 core apps comes from GET /health today. To make
  * this fully data-driven (and to support the "available" apps), implement GET /applications and
  * have it return every app + its `connected` state — then this page can drop the hardcoded
  * CORE_APPS / AVAILABLE_APPS fallbacks in api.ts.
  */
-export function Applications() {
+export function Applications({ onMailStatusChange }: { onMailStatusChange?: () => void }) {
   const [statuses, setStatuses] = useState<Record<string, boolean> | null>(null)
+  const [gmailConnected, setGmailConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -137,28 +181,44 @@ export function Applications() {
         ),
       )
       .catch(() => setError("Could not load applications."))
+
+    getMailStatus()
+      .then((s) => setGmailConnected(s.connected))
+      .catch(() => setGmailConnected(false))
   }, [])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
   if (!statuses) return <p className="text-sm text-muted-foreground">Loading…</p>
 
-  // The 3 core apps, with live connected-status overlaid from /health.
-  const core: Application[] = Object.entries(CORE_APPS).map(([id, meta]) => ({
-    id,
-    ...meta,
-    connected: statuses[id] ?? false,
-  }))
+  function handleChanged() {
+    getMailStatus()
+      .then((s) => setGmailConnected(s.connected))
+      .catch(() => setGmailConnected(false))
+    onMailStatusChange?.()
+  }
+
+  // Gmail first — it's the one app that's actually live. The rest come from /health.
+  const core: Application[] = [
+    { ...GMAIL_APP, connected: gmailConnected },
+    ...Object.entries(CORE_APPS).map(([id, meta]) => ({
+      id,
+      ...meta,
+      connected: statuses[id] ?? false,
+    })),
+  ]
 
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Plug className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-semibold">Connected apps</h2>
+          <h2 className="font-readout text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Connected apps
+          </h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {core.map((app) => (
-            <AppCard key={app.id} {...app} />
+            <AppCard key={app.id} {...app} onChanged={handleChanged} />
           ))}
         </div>
       </section>
@@ -166,11 +226,13 @@ export function Applications() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Plus className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-semibold">Connect a new app</h2>
+          <h2 className="font-readout text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Connect a new app
+          </h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {AVAILABLE_APPS.map((app) => (
-            <AppCard key={app.id} {...app} />
+            <AppCard key={app.id} {...app} onChanged={handleChanged} />
           ))}
         </div>
       </section>

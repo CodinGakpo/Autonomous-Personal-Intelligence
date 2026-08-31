@@ -1,7 +1,7 @@
 import { FileText, Upload, X } from "lucide-react"
 import { type FormEvent, useRef, useState } from "react"
 
-import { type OnboardRequest, type Product, type Role, onboard } from "@/api"
+import { type OnboardRequest, type OrgRole, type Product, onboard } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,7 @@ const PRODUCTS: { value: Product; label: string }[] = [
   { value: "product_three", label: "Product Three" },
 ]
 
-const ROLES: Role[] = ["admin", "gtm", "sales"]
+const ROLES: OrgRole[] = ["admin", "gtm", "sales"]
 
 // Resume upload constraints (client-side validation).
 const RESUME_ACCEPT = ".pdf,.doc,.docx"
@@ -30,7 +30,7 @@ export function Onboard({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [slack, setSlack] = useState("")
-  const [role, setRole] = useState<Role>("sales")
+  const [role, setRole] = useState<OrgRole>("sales")
   const [products, setProducts] = useState<Product[]>([])
   const [resume, setResume] = useState<File | null>(null)
   const [resumeError, setResumeError] = useState<string | null>(null)
@@ -98,6 +98,11 @@ export function Onboard({ onDone }: { onDone: () => void }) {
     <Card className="max-w-lg">
       <CardHeader>
         <CardTitle>Onboard a team member</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Creates a ClickUp task for this person, with their role, Slack handle, and product
+          assignments recorded in the task description — the starting record for their
+          onboarding checklist.
+        </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -124,8 +129,8 @@ export function Onboard({ onDone }: { onDone: () => void }) {
             <select
               id="role"
               value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm capitalize shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onChange={(e) => setRole(e.target.value as OrgRole)}
+              className="flex h-9 w-full rounded-md border border-input px-3 py-1 text-sm capitalize shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>

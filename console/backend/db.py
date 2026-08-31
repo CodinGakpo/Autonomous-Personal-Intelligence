@@ -56,33 +56,3 @@ def seed_admin(settings: Settings) -> None:
             )
             db.commit()
 
-
-# ---------------------------------------------------------------------------
-# Demo-only seed data — all 9 team members as login accounts.
-# Called when create_app(demo_seed=True) is used (i.e. _demo_server.py).
-# Password is "demo" for every account — NOT for production use.
-# ---------------------------------------------------------------------------
-
-_DEMO_USERS: list[tuple[str, str]] = [
-    # (email, access_role)
-    ("fenil@agent-os.local", "admin"),
-    ("usman@agent-os.local", "admin"),
-    ("manikandan@agent-os.local", "team_lead"),
-    ("hirak@agent-os.local", "developer"),
-    ("sajal@agent-os.local", "developer"),
-    ("pruthvik@agent-os.local", "developer"),
-    ("ayush@agent-os.local", "developer"),
-    ("sudeep@agent-os.local", "developer"),
-    ("yogesh@agent-os.local", "developer"),
-]
-
-
-def seed_demo_employees() -> None:
-    """Seed all team members as User login records (demo only, password='demo')."""
-    _pw = hash_password("demo")
-    with _factory()() as db:
-        for email, role in _DEMO_USERS:
-            if db.scalar(select(User).where(User.email == email)) is None:
-                db.add(User(email=email, password_hash=_pw, role=role, is_active=True))
-        db.commit()
-

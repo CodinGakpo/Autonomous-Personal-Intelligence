@@ -1,8 +1,8 @@
 """Résumé endpoints — serve pre-parsed résumé JSON files for roster members.
 
 Storage: parsed résumé JSON files live in ``_samples/resume_{slug}.json`` where
-``slug`` is the local part of the employee's email (e.g. ``usman`` for
-``usman@agent-os.local``).  In production, point RESUME_DIR at a proper directory.
+``slug`` is the local part of the employee's email (e.g. ``jane`` for
+``jane@agent-os.local``).  In production, point RESUME_DIR at a proper directory.
 
 RBAC (ADR-0003, Law 1):
   - Developers may only retrieve their own résumé.
@@ -38,7 +38,7 @@ def _resume_path(email: str, resume_dir: Path = _DEFAULT_RESUME_DIR) -> Path:
 
 @router.get("/resume")
 def get_resume(
-    email: str,  # query param: ?email=usman@agent-os.local
+    email: str,  # query param: ?email=jane@agent-os.local
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
     """Return the parsed résumé JSON for *email*.

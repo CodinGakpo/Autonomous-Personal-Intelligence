@@ -15,10 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from console.backend import auth, health, onboarding, resume
 from console.backend.config import Settings, get_settings
-from console.backend.db import configure_engine, seed_admin, seed_demo_employees
+from console.backend.db import configure_engine, seed_admin
 
 
-def create_app(settings: Settings | None = None, *, demo_seed: bool = False) -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or get_settings()
 
     @asynccontextmanager
@@ -26,8 +26,6 @@ def create_app(settings: Settings | None = None, *, demo_seed: bool = False) -> 
         # Connect + create tables + seed admin on startup (not at import time).
         configure_engine(resolved.database_url)
         seed_admin(resolved)
-        if demo_seed:
-            seed_demo_employees()
         yield
 
     app = FastAPI(title="Agent OS — Ops Console", version="0.1.0", lifespan=lifespan)
