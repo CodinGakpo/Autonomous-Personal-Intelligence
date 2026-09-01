@@ -1,4 +1,15 @@
-import { Check, Clock, ExternalLink, Plug, Plus } from "lucide-react"
+import {
+  Calendar,
+  Check,
+  CheckSquare,
+  Clock,
+  ExternalLink,
+  FileText,
+  Hash,
+  Mail,
+  Plug,
+  Plus,
+} from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { type Application, AVAILABLE_APPS, CORE_APPS, GMAIL_APP, connectApp, disconnectApp, getHealth } from "@/api"
@@ -14,6 +25,24 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { connectMail, disconnectMail, getMailStatus } from "@/lib/brainApi"
+
+const APP_ICON: Record<string, { icon: typeof Plug; className: string }> = {
+  gmail: { icon: Mail, className: "bg-red-50 text-red-500" },
+  clickup: { icon: CheckSquare, className: "bg-violet-50 text-violet-500" },
+  slack: { icon: Hash, className: "bg-fuchsia-50 text-fuchsia-500" },
+  google_calendar: { icon: Calendar, className: "bg-blue-50 text-blue-500" },
+  notion: { icon: FileText, className: "bg-neutral-100 text-neutral-600" },
+}
+
+function AppIcon({ id }: { id: string }) {
+  const entry = APP_ICON[id] ?? { icon: Plug, className: "bg-accent text-primary" }
+  const Icon = entry.icon
+  return (
+    <span className={["flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", entry.className].join(" ")}>
+      <Icon className="h-4 w-4" />
+    </span>
+  )
+}
 
 /**
  * One app, shown as a card with an inline "set up" flow.
@@ -91,23 +120,26 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
   }
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <CardTitle className="text-base">{name}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+    <Card className="card-hover">
+      <CardHeader className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <AppIcon id={id} />
+            <CardTitle className="truncate text-base">{name}</CardTitle>
+          </div>
+          {done ? (
+            <Badge variant="success" className="shrink-0">
+              <Check className="mr-1 h-3 w-3" />
+              Connected
+            </Badge>
+          ) : (
+            <Badge variant="caution" className="shrink-0">
+              <Clock className="mr-1 h-3 w-3" />
+              Not connected
+            </Badge>
+          )}
         </div>
-        {done ? (
-          <Badge variant="default">
-            <Check className="mr-1 h-3 w-3" />
-            Connected
-          </Badge>
-        ) : (
-          <Badge variant="caution">
-            <Clock className="mr-1 h-3 w-3" />
-            Not connected
-          </Badge>
-        )}
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {id === "gmail" && !done && (
@@ -213,7 +245,15 @@ export function Applications({ onMailStatusChange }: { onMailStatusChange?: () =
   }, [])
 
   if (error) return <p className="text-sm text-destructive">{error}</p>
-  if (!statuses) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!statuses) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-32 animate-pulse rounded-xl border bg-muted/60" />
+        ))}
+      </div>
+    )
+  }
 
   function handleChanged() {
     getMailStatus()
@@ -239,10 +279,11 @@ export function Applications({ onMailStatusChange }: { onMailStatusChange?: () =
   return (
     <div className="flex flex-col gap-8">
       {connected.length > 0 && (
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-3 animate-fade-up">
           <div className="flex items-center gap-2">
             <Plug className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold text-foreground">Connected</h2>
+            <span className="text-sm text-muted-foreground">({connected.length})</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {connected.map((app) => (
@@ -252,7 +293,7 @@ export function Applications({ onMailStatusChange }: { onMailStatusChange?: () =
         </section>
       )}
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3 animate-fade-up" style={{ animationDelay: "80ms" }}>
         <div className="flex items-center gap-2">
           <Plus className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold text-foreground">Add an app</h2>

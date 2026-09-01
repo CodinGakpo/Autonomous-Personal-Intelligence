@@ -1,4 +1,5 @@
-import { Loader2, Mail, MailX, Map, PlugZap, RefreshCw } from "lucide-react"
+import { Check, Loader2, Mail, MailX, Map, PlugZap, RefreshCw } from "lucide-react"
+import type { ReactNode } from "react"
 import { useState } from "react"
 
 import type { View } from "@/App"
@@ -22,22 +23,53 @@ interface HomeRail {
   mailConnected: boolean | null
 }
 
+function StatCard({
+  icon: Icon,
+  iconClass,
+  label,
+  value,
+  suffix,
+  action,
+  delay,
+}: {
+  icon: typeof Mail
+  iconClass: string
+  label: string
+  value: ReactNode
+  suffix?: ReactNode
+  action?: ReactNode
+  delay?: string
+}) {
+  return (
+    <Card className="card-hover animate-fade-up" style={delay ? { animationDelay: delay } : undefined}>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        <span className={["flex h-8 w-8 items-center justify-center rounded-lg", iconClass].join(" ")}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </CardHeader>
+      <CardContent>
+        <p className="text-3xl font-semibold tracking-tight">
+          {value}
+          {suffix}
+        </p>
+        {action}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: View) => void }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Connected apps
-            </CardTitle>
-            <PlugZap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {rail.appsConnected}
-              <span className="text-lg text-muted-foreground"> / {rail.appsTotal}</span>
-            </p>
+        <StatCard
+          icon={PlugZap}
+          iconClass="bg-accent text-primary"
+          label="Connected apps"
+          value={rail.appsConnected}
+          suffix={<span className="text-lg text-muted-foreground"> / {rail.appsTotal}</span>}
+          action={
             <button
               type="button"
               onClick={() => onNavigate("applications")}
@@ -45,35 +77,34 @@ export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: 
             >
               Manage connected apps
             </button>
-          </CardContent>
-        </Card>
+          }
+        />
 
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Your mail
-            </CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {rail.mailThreads === null ? "—" : rail.mailThreads}
-            </p>
-            <p className="text-sm text-muted-foreground">conversations organized</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          icon={Mail}
+          iconClass="bg-emerald-50 text-emerald-600"
+          label="Your mail"
+          value={rail.mailThreads === null ? "—" : rail.mailThreads}
+          action={<p className="text-sm text-muted-foreground">conversations organized</p>}
+          delay="60ms"
+        />
       </div>
 
       {rail.mailConnected === false ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-            <MailX className="h-10 w-10 text-muted-foreground" />
+        <Card className="animate-fade-up" style={{ animationDelay: "120ms" }}>
+          <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <MailX className="h-6 w-6" />
+            </span>
             <div>
               <p className="font-medium">Gmail isn't connected</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Connect Gmail from the Connected apps tab to see your mail here.
+              <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                Connect Gmail to see your mail organized here and ask questions about it.
               </p>
             </div>
+            <Button size="sm" className="mt-1" onClick={() => onNavigate("applications")}>
+              Connect Gmail
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -133,7 +164,7 @@ function MailPanel() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
+      <Card className="animate-fade-up" style={{ animationDelay: "120ms" }}>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <CardTitle>Your mail</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
@@ -166,22 +197,32 @@ function MailPanel() {
           <p className="text-sm text-muted-foreground">
             New mail is also checked automatically every 4 hours.
           </p>
-          {reloadResult && <p className="mt-2 text-sm text-primary">{reloadResult}</p>}
-          {reloadError && <p className="mt-2 text-sm text-destructive">{reloadError}</p>}
+          {reloadResult && (
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-emerald-600 animate-fade-up">
+              <Check className="h-3.5 w-3.5" />
+              {reloadResult}
+            </p>
+          )}
+          {reloadError && <p className="mt-2 text-sm text-destructive animate-fade-up">{reloadError}</p>}
         </CardContent>
       </Card>
 
       {showMindmap && (
-        <Card>
-          <CardContent className="pt-6">
-            {treeLoading && <p className="text-sm text-muted-foreground">Loading your mail map…</p>}
-            {treeError && <p className="text-sm text-destructive">{treeError}</p>}
+        <Card className="animate-fade-up overflow-hidden">
+          <CardContent className="p-0">
+            {treeLoading && (
+              <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading your mail map…
+              </div>
+            )}
+            {treeError && <p className="p-6 text-sm text-destructive">{treeError}</p>}
             {tree && <MailMindmap data={tree} />}
           </CardContent>
         </Card>
       )}
 
-      <div className="max-w-[420px]">
+      <div className="max-w-[420px] animate-fade-up" style={{ animationDelay: "180ms" }}>
         <MailChat />
       </div>
     </div>

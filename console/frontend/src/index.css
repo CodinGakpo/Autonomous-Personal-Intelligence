@@ -1,5 +1,5 @@
 /* Font @import must precede the Tailwind import. */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -10,33 +10,44 @@
    Palette: page #FAFAF9, card #FFFFFF, ink #1F2328, dim #6B7280,
    primary (accent) #4C6FFF, caution (pending) #B45309, danger #DC2626. */
 :root {
-  --radius: 0.75rem;
-  --background: #fafaf9;
-  --foreground: #1f2328;
+  --radius: 0.875rem;
+  --background: #f7f7f6;
+  --foreground: #1a1d23;
   --card: #ffffff;
-  --card-foreground: #1f2328;
+  --card-foreground: #1a1d23;
   --popover: #ffffff;
-  --popover-foreground: #1f2328;
+  --popover-foreground: #1a1d23;
   --primary: #4c6fff;
+  --primary-hover: #3d5cf0;
   --primary-foreground: #ffffff;
   --secondary: #f1f2f4;
-  --secondary-foreground: #1f2328;
+  --secondary-foreground: #1a1d23;
   --muted: #f5f5f4;
-  --muted-foreground: #6b7280;
+  --muted-foreground: #676d7a;
   --accent: #eef2ff;
-  --accent-foreground: #1f2328;
+  --accent-foreground: #1a1d23;
   --caution: #fef3c7;
   --caution-foreground: #92400e;
+  --success: #dcfce7;
+  --success-foreground: #15803d;
   --destructive: #dc2626;
-  --border: #e5e7eb;
-  --input: #d1d5db;
+  --border: #e7e7e5;
+  --input: #d9dade;
   --ring: #4c6fff;
+
+  /* Layered, tinted shadows read as more premium than flat grey ones. */
+  --shadow-color: 220 20% 55%;
+  --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.06);
+  --shadow-md: 0 1px 3px hsl(var(--shadow-color) / 0.08), 0 6px 16px -8px hsl(var(--shadow-color) / 0.12);
+  --shadow-lg: 0 12px 32px -12px hsl(var(--shadow-color) / 0.22), 0 2px 8px -2px hsl(var(--shadow-color) / 0.10);
+  --shadow-glow: 0 0 0 1px hsl(230 100% 65% / 0.12), 0 8px 24px -8px hsl(230 100% 65% / 0.35);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -54,6 +65,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-caution: var(--caution);
   --color-caution-foreground: var(--caution-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -64,12 +77,41 @@
   * {
     border-color: var(--color-border);
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     background-color: var(--color-background);
+    background-image:
+      radial-gradient(60rem 30rem at 100% -10%, hsl(230 100% 92% / 0.55), transparent 60%),
+      radial-gradient(50rem 26rem at -10% 0%, hsl(160 60% 90% / 0.35), transparent 55%);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-primary) 25%, transparent);
+    color: var(--color-foreground);
+  }
+
+  /* Slim, unobtrusive scrollbars everywhere instead of the OS default. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-input) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-input);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
   }
 
   /* Force a consistent light control everywhere <select> renders (closed control and the
@@ -96,5 +138,75 @@
     height: 8px;
     border-radius: 999px;
     background: currentColor;
+  }
+  .status-dot-live {
+    position: relative;
+  }
+  .status-dot-live::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.35;
+    animation: pulse-ring 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .shadow-elev-sm { box-shadow: var(--shadow-sm); }
+  .shadow-elev-md { box-shadow: var(--shadow-md); }
+  .shadow-elev-lg { box-shadow: var(--shadow-lg); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+
+  .card-hover {
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-up {
+    animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-pop {
+    animation: pop-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.45; }
+  70% { transform: scale(1.9); opacity: 0; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
