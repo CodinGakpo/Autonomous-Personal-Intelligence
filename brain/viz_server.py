@@ -210,14 +210,21 @@ class MailReloadRequest(BaseModel):
 
 
 @app.post("/api/mail/reload")
-def mail_reload(body: MailReloadRequest, user: CurrentUser) -> dict[str, Any]:
+def mail_reload(body: MailReloadRequest, user: CurrentUser, conn: ConnDep) -> dict[str, Any]:
     """Ingest unread mail from the last `since_minutes` minutes into the caller's own tree."""
-    results = mail_ingest.run(since_minutes=body.since_minutes, user_id=user)
+    # `conn` (the injected per-request connection) is what actually gets written to — `user_id`
+    # is passed separately only for the real IMAP fetch/mark-read, which has no test-injectable
+    # seam of its own. Deriving the SQLite connection from `user_id` here instead of using `conn`
+    # was the bug: a test overriding `get_user_conn` to an isolated tmp database while faking
+    # `get_current_user_id` to a real id still ended up writing to that real id's production
+    # file, because `mail_ingest.run` fell back to `store.connect(user_id=...)` whenever `conn`
+    # was omitted.
+    results = mail_ingest.run(conn, since_minutes=body.since_minutes, user_id=user)
     return {"processed": len(results), "results": results}
 
 
 @app.post("/api/mail/reload/stream")
-def mail_reload_stream(body: MailReloadRequest, user: CurrentUser) -> StreamingResponse:
+def mail_reload_stream(body: MailReloadRequest, user: CurrentUser, conn: ConnDep) -> StreamingResponse:
     """Ingest unread mail, streaming one NDJSON progress event per step.
 
     Same work as /api/mail/reload, but the caller finds out what is happening while it happens
@@ -227,7 +234,9 @@ def mail_reload_stream(body: MailReloadRequest, user: CurrentUser) -> StreamingR
 
     def events() -> Iterator[str]:
         try:
-            for event in mail_ingest.run_iter(since_minutes=body.since_minutes, user_id=user):
+            # See mail_reload's comment: pass `conn` explicitly rather than letting run_iter
+            # re-derive its own connection from `user_id`.
+            for event in mail_ingest.run_iter(conn, since_minutes=body.since_minutes, user_id=user):
                 yield json.dumps(event) + "\n"
         except (Exception, SystemExit) as exc:
             # A failure mid-stream still has to reach the client: the response is already 200
