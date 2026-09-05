@@ -194,6 +194,7 @@ function MailPanel({ onAskAbout }: { onAskAbout: (question: string) => void }) {
     setReloadError(null)
     setReloadResult(null)
     setProgress(null)
+    const startedAt = Date.now()
     try {
       // Streamed so the progress bar reflects real per-email progress, not a guess.
       const events = await reloadMailStream(windowMinutes, setProgress)
@@ -207,6 +208,13 @@ function MailPanel({ onAskAbout }: { onAskAbout: (question: string) => void }) {
     } catch (err) {
       setReloadError(err instanceof Error ? err.message : "Couldn't check for new mail.")
     } finally {
+      // A window with no new mail round-trips in well under 100ms — too fast for the loader
+      // to actually be seen. Hold it visible for a minimum stretch so it always registers.
+      const elapsed = Date.now() - startedAt
+      const MIN_VISIBLE_MS = 600
+      if (elapsed < MIN_VISIBLE_MS) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_VISIBLE_MS - elapsed))
+      }
       setReloading(false)
       setProgress(null)
     }
