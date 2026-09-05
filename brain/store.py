@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from brain.resolver import Resolution, normalize, resolve
+from brain.resolver import Resolution, resolve
 
 DEFAULT_DB = Path(__file__).resolve().parent / "brain.db"
 
@@ -192,17 +192,6 @@ def get(conn: sqlite3.Connection, entity_id: str) -> dict[str, Any] | None:
     return _row_to_entity(row) if row else None
 
 
-def find_by_title(conn: sqlite3.Connection, type_: str, name: str | None) -> dict[str, Any] | None:
-    """Find one node of a type whose title matches `name` after normalization (for edge linking)."""
-    target = normalize(name)
-    if not target:
-        return None
-    for row in conn.execute("SELECT * FROM entities WHERE type = ?", (type_,)).fetchall():
-        if normalize(row["title"]) == target:
-            return _row_to_entity(row)
-    return None
-
-
 def neighbors(
     conn: sqlite3.Connection, entity_id: str, relation: str | None = None, *, incoming: bool = False
 ) -> list[dict[str, Any]]:
@@ -215,30 +204,6 @@ def neighbors(
         params.append(relation)
     ids = [r["oid"] for r in conn.execute(sql, params).fetchall()]
     return [e for e in (get(conn, i) for i in ids) if e]
-
-
-def remove_edges(
-    conn: sqlite3.Connection,
-    *,
-    src_id: str | None = None,
-    dst_id: str | None = None,
-    relation: str | None = None,
-) -> int:
-    """Delete edges matching whichever of src/dst/relation are given. Returns the row count.
-
-    At least one filter is required — a bare `remove_edges(conn)` would wipe the graph, so it
-    raises instead.
-    """
-    clauses, params = [], []
-    for col, value in (("src_id", src_id), ("dst_id", dst_id), ("relation", relation)):
-        if value is not None:
-            clauses.append(f"{col} = ?")
-            params.append(value)
-    if not clauses:
-        raise ValueError("remove_edges needs at least one of src_id / dst_id / relation")
-    cur = conn.execute(f"DELETE FROM edges WHERE {' AND '.join(clauses)}", params)
-    conn.commit()
-    return cur.rowcount
 
 
 def delete(conn: sqlite3.Connection, entity_id: str) -> bool:
