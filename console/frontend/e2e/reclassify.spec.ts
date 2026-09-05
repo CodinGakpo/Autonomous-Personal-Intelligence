@@ -164,7 +164,7 @@ test.describe("review queue", () => {
 
     await signIn(page)
     await page.getByRole("button", { name: "Mail", exact: true }).click()
-    await expect(page.getByRole("button", { name: /view mail map/i })).toBeVisible()
+    await expect(page.getByRole("button", { name: /view map/i })).toBeVisible()
     await expect(page.getByTestId("review-queue")).toHaveCount(0)
   })
 })

@@ -224,7 +224,9 @@ def mail_reload(body: MailReloadRequest, user: CurrentUser, conn: ConnDep) -> di
 
 
 @app.post("/api/mail/reload/stream")
-def mail_reload_stream(body: MailReloadRequest, user: CurrentUser, conn: ConnDep) -> StreamingResponse:
+def mail_reload_stream(
+    body: MailReloadRequest, user: CurrentUser, conn: ConnDep
+) -> StreamingResponse:
     """Ingest unread mail, streaming one NDJSON progress event per step.
 
     Same work as /api/mail/reload, but the caller finds out what is happening while it happens

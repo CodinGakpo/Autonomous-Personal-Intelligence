@@ -75,7 +75,7 @@ export async function signIn(page: Page): Promise<void> {
 /** Seed the signed-in user's mail tree, then open the Mail tab with the mindmap showing. */
 export async function openMailMap(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Mail", exact: true }).click()
-  await page.getByRole("button", { name: /view mail map/i }).click()
+  await page.getByRole("button", { name: /view map/i }).click()
   await expect(page.locator(".mail-mindmap-root")).toBeVisible()
 }
 

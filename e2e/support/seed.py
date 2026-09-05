@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import UTC, datetime, timedelta
 
 from brain import mail_ingest, store
 from brain.emailtool import _token_path
@@ -22,14 +23,31 @@ from brain.emailtool import _token_path
 def _mark_gmail_connected(user_id: str) -> None:
     """Make /api/mail/status report a connected mailbox.
 
-    That endpoint only checks whether a cached token file exists, and the Mail tab hides the
-    mail map entirely when Gmail is disconnected. No IMAP call is ever made in the suite, so a
-    placeholder file is an honest stand-in. Playwright sets GMAIL_TOKEN_PATH into e2e/.tmp so
-    this never writes to a developer's real ~/.hermes.
+    That endpoint (brain/emailtool.py's mailbox_status) does a real credential load — not just
+    `Path.exists()` — so the token file has to be shaped like genuine google-auth credentials
+    with a far-future `expiry`, or `Credentials.valid` is False and it either tries a real
+    network refresh (fails against a fake refresh_token) or reports disconnected outright. No
+    IMAP call is ever made in the suite, so a fake-but-validly-shaped, never-expiring token is an
+    honest stand-in. Playwright sets GMAIL_TOKEN_PATH into e2e/.tmp so this never writes to a
+    developer's real ~/.hermes.
     """
     path = _token_path(user_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"token": "e2e-placeholder"}), encoding="utf-8")
+    far_future = (datetime.now(UTC) + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    path.write_text(
+        json.dumps(
+            {
+                "token": "e2e-fake-access-token",
+                "refresh_token": "e2e-fake-refresh-token",
+                "client_id": "e2e-fake-client-id",
+                "client_secret": "e2e-fake-client-secret",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "scopes": ["https://mail.google.com/"],
+                "expiry": far_future,
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def seed(user_id: str) -> None:
