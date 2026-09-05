@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from brain import bm25, store
+from brain import bm25, profile, store
 from brain.openrouter import call_openrouter
 
 TOP_K = 8  # tunable: how many full thread bodies to include, see module docstring
@@ -26,7 +26,11 @@ Answer ONLY from the MAIL CONTEXT below — never invent senders, dates, deadlin
 that aren't there. If the answer isn't in the context, say plainly that you don't see it in
 the ingested mail rather than guessing. Keep answers short and direct (a sentence or two,
 longer only if the question needs a list). Do not mention internal details like "BM25",
-"top threads", or how this context was assembled — just answer the question."""
+"top threads", or how this context was assembled — just answer the question.
+
+Attachment findings are authoritative. They come from actually reading the file, whereas a
+thread's summary is prose written earlier and may be out of date — where the two disagree
+about whether an attachment mentions the user, trust the attachment finding."""
 
 
 def _walk_tree(conn: Any) -> list[tuple[str, str, dict[str, Any]]]:
@@ -46,7 +50,21 @@ def _walk_tree(conn: Any) -> list[tuple[str, str, dict[str, Any]]]:
 
 def _thread_doc_text(thread: dict[str, Any]) -> str:
     body = (thread.get("data") or {}).get("body") or ""
-    return " ".join(p for p in (thread.get("title"), thread.get("summary"), body) if p)
+    # Attachment text is part of what a thread "says": a shortlist spreadsheet may be the only
+    # place a company name or your roll number appears, so it must be rankable too.
+    attachments = " ".join(
+        " ".join(
+            [
+                str(f.get("file") or ""),
+                str(f.get("finding") or ""),
+                *(str(m) for m in (f.get("mentions_you") or [])),
+            ]
+        )
+        for f in ((thread.get("data") or {}).get("attachments") or [])
+        if isinstance(f, dict)
+    )
+    parts = (thread.get("title"), thread.get("summary"), body, attachments)
+    return " ".join(str(p) for p in parts if p)
 
 
 def _rank_threads(
@@ -69,18 +87,66 @@ def _rank_threads(
     return [by_id[tid] for tid in top_ids]
 
 
+def _overview_attachment_note(thread: dict[str, Any]) -> str:
+    """A compact attachment marker for the one-line overview.
+
+    "Is my name in any attachment?" is a question about *every* thread, but only the top few
+    are expanded in full — so the answer has to be visible from the overview alone.
+    """
+    findings = [
+        f for f in ((thread.get("data") or {}).get("attachments") or []) if isinstance(f, dict)
+    ]
+    if not findings:
+        return ""
+    named = sorted({m for f in findings for m in (f.get("mentions_you") or [])})
+    if named:
+        return f" [{len(findings)} attachment(s); NAMES THE USER: {', '.join(map(str, named))}]"
+    return f" [{len(findings)} attachment(s); does not name the user]"
+
+
 def _format_overview(rows: list[tuple[str, str, dict[str, Any]]]) -> str:
     lines = []
     for cat, topic, thread in rows:
         summary = thread.get("summary") or "(no summary)"
-        lines.append(f"  [{cat} > {topic}] {thread['title']} — {summary}")
+        # The attachment verdict leads the line. Appended to the end it landed ~525 characters
+        # in, after a long summary, and a small model simply did not attend to it — it answered
+        # "not listed" about a shortlist the line said named the user.
+        note = _overview_attachment_note(thread)
+        prefix = f"{note} " if note else ""
+        lines.append(f"  {prefix}[{cat} > {topic}] {thread['title']} — {summary}")
     return "\n".join(lines)
+
+
+def _format_attachments(thread: dict[str, Any]) -> str:
+    """What was found inside this thread's attachments, including whether it named the user.
+
+    Without this the answer side is blind to attachments entirely: findings are produced at
+    ingest and would otherwise never reach the question being asked.
+    """
+    findings = (thread.get("data") or {}).get("attachments") or []
+    if not findings:
+        return ""
+    lines = []
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        name = finding.get("file", "attachment")
+        kind = finding.get("kind", "file")
+        mentions = finding.get("mentions_you") or []
+        marker = f" [NAMES THE USER: {', '.join(map(str, mentions))}]" if mentions else ""
+        detail = finding.get("finding")
+        lines.append(f"- {name} ({kind}){marker}: {detail}")
+    return "\nAttachments:\n" + "\n".join(lines) if lines else ""
 
 
 def _format_full_thread(cat: str, topic: str, thread: dict[str, Any]) -> str:
     body = (thread.get("data") or {}).get("body") or "(no body captured)"
+    # Attachments precede the prose. A summary is written by the model at ingest and can go
+    # stale — one here read "attachments indicate the sender was not listed" for a spreadsheet
+    # that does name the user — so the scanned facts must be read first, not last.
     return (
-        f"### {thread['title']}  [{cat} > {topic}]\n"
+        f"### {thread['title']}  [{cat} > {topic}]"
+        f"{_format_attachments(thread)}\n"
         f"Summary: {thread.get('summary') or '(none)'}\n"
         f"Body:\n{body}"
     )
@@ -102,12 +168,13 @@ def build_prompt(
         "(no thread matched this question closely — rely on the overview above, and say so "
         "if it isn't enough to answer)"
     )
-    profile = _format_profile(profile_details)
+    # Not named `profile`: that would shadow the imported brain.profile module.
+    profile_block = _format_profile(profile_details)
     return (
         f"{SYSTEM}\n\n"
         f"=== MAIL OVERVIEW (every thread, one line each) ===\n{overview}\n\n"
         f"=== RELEVANT THREADS IN FULL ===\n{full}\n\n"
-        f"=== ABOUT THE PERSON ASKING (optional context) ===\n{profile}\n\n"
+        f"=== ABOUT THE PERSON ASKING (optional context) ===\n{profile_block}\n\n"
         f"=== QUESTION ===\n{question}\n"
     )
 
@@ -130,7 +197,13 @@ def ask_mail(
             "answer": "Your mail knowledge tree is empty — connect your mailbox and let it "
             "ingest some mail first, then ask again."
         }
+    # The profile lives server-side (brain/profile.py) so headless ingestion can read it too;
+    # anything the caller passes is merged on top rather than replacing it.
+    stored = profile.load_profile(conn)
+    seen = {d.get("key", "").strip().lower() for d in (profile_details or [])}
+    merged = list(profile_details or []) + [d for d in stored if d["key"].lower() not in seen]
+
     top_threads = _rank_threads(question, rows, top_k=top_k)
-    prompt = build_prompt(question, rows, top_threads, profile_details or [])
+    prompt = build_prompt(question, rows, top_threads, merged)
     reply = call_openrouter(prompt)
     return {"answer": reply.strip()}

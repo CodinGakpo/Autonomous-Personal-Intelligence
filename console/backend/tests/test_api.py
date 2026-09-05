@@ -27,6 +27,7 @@ def _settings(tmp_path: Path) -> Settings:
         clickup_employees_list_id="900",
         database_url=f"sqlite:///{tmp_path}/test.db",
         secret_key="test-secret-at-least-32-bytes-long!!",
+        brain_api_base_url="http://localhost:8080",
     )
 
 

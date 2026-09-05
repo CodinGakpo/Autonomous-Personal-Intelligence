@@ -1,5 +1,5 @@
-// Shared "About you" details storage: Profile.tsx edits it, MailChat.tsx reads it to fold
-// into mail-ask requests as light personal context. Kept out of pages/ so a component
+// Shared "About you" details storage: Profile.tsx edits it, pages/Chat.tsx reads it to fold
+// into chat requests as light personal context. Kept out of pages/ so a component
 // doesn't import from a page module.
 export interface ProfileDetail {
   id: string

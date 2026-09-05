@@ -195,7 +195,7 @@ export const CORE_APPS: Record<string, Omit<Application, "id" | "connected">> = 
 export const GMAIL_APP: Omit<Application, "connected"> = {
   id: "gmail",
   name: "Gmail",
-  description: "Reads your unread mail so you can ask about it. See the Home tab.",
+  description: "Reads your unread mail so you can ask about it. See the Chat tab.",
   kind: "oauth",
 }
 
@@ -218,6 +218,69 @@ export function connectApp(id: string, credential: string): Promise<{ authUrl?: 
 // BACKEND TODO: implement POST /applications/{id}/disconnect (remove the stored secret).
 export function disconnectApp(id: string): Promise<void> {
   return request<void>(`/applications/${id}/disconnect`, { method: "POST" })
+}
+
+// ===========================================================================
+// Chat — persisted mail-chat sessions (console/backend/chat.py). Lives here, not in
+// lib/brainApi.ts, because console/backend owns session/message storage and ownership
+// checks; it proxies the actual Q&A to the brain service server-side (see chat.py).
+// ===========================================================================
+
+export interface ChatSession {
+  id: number
+  title: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ChatMessage {
+  id: number
+  role: "user" | "assistant"
+  content: string
+  created_at: string
+}
+
+export interface ChatSessionWithMessages extends ChatSession {
+  messages: ChatMessage[]
+}
+
+export interface ChatProfileDetail {
+  key: string
+  value: string
+}
+
+export function listChatSessions(): Promise<ChatSession[]> {
+  return request<ChatSession[]>("/chat/sessions")
+}
+
+export function createChatSession(): Promise<ChatSession> {
+  return request<ChatSession>("/chat/sessions", { method: "POST" })
+}
+
+export function getChatSession(id: number): Promise<ChatSessionWithMessages> {
+  return request<ChatSessionWithMessages>(`/chat/sessions/${id}`)
+}
+
+export function renameChatSession(id: number, title: string): Promise<ChatSession> {
+  return request<ChatSession>(`/chat/sessions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  })
+}
+
+export function deleteChatSession(id: number): Promise<void> {
+  return request<void>(`/chat/sessions/${id}`, { method: "DELETE" })
+}
+
+export function postChatMessage(
+  sessionId: number,
+  question: string,
+  profileDetails: ChatProfileDetail[],
+): Promise<ChatMessage> {
+  return request<ChatMessage>(`/chat/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ question, profile_details: profileDetails }),
+  })
 }
 
 

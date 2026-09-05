@@ -15,6 +15,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "google-auth" },
     { name = "google-auth-oauthlib" },
+    { name = "httpx" },
     { name = "openpyxl" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyjwt" },
@@ -31,7 +32,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "behave" },
-    { name = "httpx" },
     { name = "import-linter" },
     { name = "mypy" },
     { name = "pre-commit" },
@@ -46,6 +46,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-auth", specifier = ">=2.35" },
     { name = "google-auth-oauthlib", specifier = ">=1.2" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pyjwt", specifier = ">=2.9" },
@@ -62,7 +63,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "behave", specifier = ">=1.2.6" },
-    { name = "httpx", specifier = ">=0.27" },
     { name = "import-linter", specifier = ">=2.0" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pre-commit", specifier = ">=3.8" },

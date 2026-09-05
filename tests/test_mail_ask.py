@@ -91,3 +91,68 @@ def test_ask_mail_folds_profile_details_into_prompt(tmp_path, monkeypatch):
     )
     mail_ask.ask_mail(conn, "interview", [{"key": "Timezone", "value": "IST"}])
     assert "Timezone: IST" in captured["prompt"]
+
+
+# --- Attachments reach the answer ---------------------------------------------------------
+
+
+def _thread_with_attachment(mentions, *, title="Hevo Data shortlist", body="See attached."):
+    return {
+        "id": "mail:thread:1",
+        "title": title,
+        "summary": "Shortlist for the next round.",
+        "data": {
+            "body": body,
+            "attachments": [
+                {
+                    "file": "shortlist.xlsx",
+                    "kind": "excel",
+                    "finding": [{"matched": mentions, "values": {"Name": "Adidev Anand"}}]
+                    if mentions
+                    else "you were not listed in this spreadsheet (40 rows)",
+                    "mentions_you": mentions,
+                }
+            ],
+        },
+    }
+
+
+def test_overview_flags_a_thread_whose_attachment_names_you():
+    rows = [("Placements", "Hevo", _thread_with_attachment(["23BCE1234"]))]
+    overview = mail_ask._format_overview(rows)
+    assert "NAMES THE USER: 23BCE1234" in overview
+
+
+def test_overview_says_when_an_attachment_does_not_name_you():
+    rows = [("Placements", "Hevo", _thread_with_attachment([]))]
+    overview = mail_ask._format_overview(rows)
+    assert "does not name the user" in overview
+
+
+def test_overview_is_unchanged_for_threads_without_attachments():
+    thread = {"id": "t", "title": "Plain mail", "summary": "s", "data": {"body": "b"}}
+    assert "attachment" not in mail_ask._format_overview([("C", "T", thread)])
+
+
+def test_full_thread_includes_attachment_findings():
+    rendered = mail_ask._format_full_thread(
+        "Placements", "Hevo", _thread_with_attachment(["23BCE1234"])
+    )
+    assert "shortlist.xlsx" in rendered
+    assert "Adidev Anand" in rendered
+    assert "NAMES THE USER" in rendered
+
+
+def test_attachment_text_is_rankable():
+    """A shortlist may be the only place a name appears — ranking must see it."""
+    thread = _thread_with_attachment(["23BCE1234"], body="See attached.")
+    doc = mail_ask._thread_doc_text(thread)
+    assert "shortlist.xlsx" in doc
+    assert "23BCE1234" in doc
+
+
+def test_prompt_carries_attachments_to_the_model():
+    rows = [("Placements", "Hevo", _thread_with_attachment(["23BCE1234"]))]
+    prompt = mail_ask.build_prompt("is my name in any attachment?", rows, rows, [])
+    assert "NAMES THE USER: 23BCE1234" in prompt
+    assert "shortlist.xlsx" in prompt

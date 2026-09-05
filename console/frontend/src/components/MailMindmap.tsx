@@ -4,7 +4,7 @@
 import * as d3 from "d3"
 import { useEffect, useRef, useState } from "react"
 
-import type { MailNode } from "@/lib/brainApi"
+import { type MailNode, reclassifyThread } from "@/lib/brainApi"
 
 import "./MailMindmap.css"
 
@@ -64,10 +64,49 @@ function countNodes(n: MailNode): NodeCounts {
   return counts
 }
 
-export function MailMindmap({ data }: { data: MailNode }) {
+export function MailMindmap({
+  data,
+  onReclassified,
+  onAskAbout,
+}: {
+  data: MailNode
+  onReclassified?: () => void | Promise<void>
+  /** Open a chat seeded with a question about the selected thread. */
+  onAskAbout?: (question: string) => void
+}) {
   const chartRef = useRef<HTMLDivElement>(null)
   const [detail, setDetail] = useState<HierarchyNode | null>(null)
   const [counts, setCounts] = useState({ mail_category: 0, mail_topic: 0, mail_thread: 0 })
+  const [moveTo, setMoveTo] = useState("")
+  const [moving, setMoving] = useState(false)
+  const [moveError, setMoveError] = useState<string | null>(null)
+
+  const categoryNames = (data.children || []).map((c) => c.name)
+  // ancestors() is [thread, topic, category, root]; the category is the third entry.
+  const currentCategory = detail?.ancestors().reverse().slice(1, -1)[0]?.data.name ?? ""
+
+  // Default the picker to wherever the thread currently sits each time one is opened.
+  useEffect(() => {
+    setMoveTo(currentCategory)
+    setMoveError(null)
+  }, [currentCategory])
+
+  async function handleMove() {
+    if (!detail || !moveTo || moveTo === currentCategory) return
+    setMoving(true)
+    setMoveError(null)
+    try {
+      await reclassifyThread(detail.data.id, moveTo)
+      // The tree is rebuilt from scratch on new `data`, and this node belongs to the old one —
+      // close the panel rather than leave it rendering a stale node.
+      setDetail(null)
+      await onReclassified?.()
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : "Couldn't move this thread.")
+    } finally {
+      setMoving(false)
+    }
+  }
 
   useEffect(() => {
     setCounts(countNodes(data))
@@ -135,6 +174,16 @@ export function MailMindmap({ data }: { data: MailNode }) {
         .attr("y", 2)
         .attr("dominant-baseline", "central")
         .text((d) => (d.data.name.length > 40 ? d.data.name.slice(0, 38) + "…" : d.data.name))
+
+      // Amber dot on threads the classifier wasn't sure about, so a wrong filing is visible
+      // at a glance rather than only discoverable by opening every thread.
+      nodeEnter
+        .filter((d) => Boolean(d.data.needs_review))
+        .append("circle")
+        .attr("class", "review-flag")
+        .attr("r", 4)
+        .attr("cx", 8)
+        .attr("cy", -NODE_HEIGHT / 2 + 8)
 
       const toggleGroup = nodeEnter
         .filter((d) => d.data.type !== "mail_thread")
@@ -245,6 +294,14 @@ export function MailMindmap({ data }: { data: MailNode }) {
             <button className="close" onClick={() => setDetail(null)}>
               &times;
             </button>
+            {onAskAbout && (
+              <button
+                className="ask-btn"
+                onClick={() => onAskAbout(`Tell me about "${detail.data.name}".`)}
+              >
+                Ask about this
+              </button>
+            )}
             <div className="path">
               {detail
                 .ancestors()
@@ -254,6 +311,50 @@ export function MailMindmap({ data }: { data: MailNode }) {
                 .join(" › ")}
             </div>
             <h2>{detail.data.name}</h2>
+
+            <div className="lbl">Category</div>
+            {detail.data.needs_review && (
+              <div className="review-note">
+                Low confidence — check this category.
+                {detail.data.classification?.llm_category &&
+                detail.data.classification.llm_category !==
+                  detail.data.classification.keyword_category ? (
+                  <>
+                    {" "}
+                    The keyword rules said{" "}
+                    <b>{detail.data.classification.keyword_category}</b>, the model said{" "}
+                    <b>{detail.data.classification.llm_category}</b>.
+                  </>
+                ) : null}
+              </div>
+            )}
+            <div className="move-row">
+              {/* A datalist-backed input, not a <select>: the right category often doesn't
+                  exist yet (that's how a thread got misfiled), and the API creates one on
+                  demand. This lets the user pick an existing category or type a new one,
+                  without pulling in a combobox dependency. */}
+              <input
+                list="mail-mindmap-categories"
+                value={moveTo}
+                onChange={(e) => setMoveTo(e.target.value)}
+                aria-label="Move to category"
+                placeholder="Category…"
+              />
+              <datalist id="mail-mindmap-categories">
+                {categoryNames.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              <button
+                className="move-btn"
+                disabled={moving || !moveTo || moveTo === currentCategory}
+                onClick={handleMove}
+              >
+                {moving ? "Moving…" : "Move"}
+              </button>
+            </div>
+            {moveError && <div className="move-error">{moveError}</div>}
+
             <div className="lbl">Summary</div>
             <div className="summary">{detail.data.summary || "(no summary)"}</div>
             {detail.data.body && (

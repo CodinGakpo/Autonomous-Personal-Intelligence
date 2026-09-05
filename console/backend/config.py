@@ -25,6 +25,9 @@ class Settings:
     clickup_employees_list_id: str | None
     database_url: str
     secret_key: str
+    # The brain service (brain/viz_server.py) — chat.py proxies mail Q&A there, forwarding the
+    # same bearer token this request carried (see console/backend/chat.py).
+    brain_api_base_url: str
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -37,6 +40,7 @@ class Settings:
             clickup_employees_list_id=os.environ.get("CLICKUP_EMPLOYEES_LIST_ID"),
             database_url=os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL),
             secret_key=os.environ.get("OPS_SECRET_KEY", "dev-secret-change-me"),
+            brain_api_base_url=os.environ.get("BRAIN_API_BASE_URL", "http://localhost:8080"),
         )
 
 

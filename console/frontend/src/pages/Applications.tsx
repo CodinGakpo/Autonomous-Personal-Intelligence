@@ -49,10 +49,15 @@ function AppCard({ id, name, description, connected, kind, credentialLabel, onCh
     try {
       const res = await connectMail()
       setDone(res.connected)
-      if (!res.connected) setNote("Authorization wasn't completed — try again.")
+      // Say *why* it didn't take. Consent can succeed in the browser and still fail
+      // server-side, and "try again" on a loop is the worst possible response to that.
+      if (!res.connected) {
+        setNote(res.reason ?? "Authorization wasn't completed — try again.")
+      }
       onChanged?.()
-    } catch {
-      setNote("Couldn't reach the mail service — is it running?")
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : ""
+      setNote(detail || "Couldn't reach the mail service — is it running?")
     } finally {
       setBusy(false)
     }

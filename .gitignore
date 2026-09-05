@@ -37,3 +37,9 @@ brain/.cache/
 05-agent-os/
 fathom-meeting-capture/
 .claude/worktrees/
+
+# E2E scratch (sqlite db, per-run artifacts)
+e2e/.tmp/
+
+
+notes.txt

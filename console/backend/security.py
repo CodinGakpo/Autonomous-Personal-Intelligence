@@ -13,6 +13,8 @@ import time
 
 import jwt
 
+from security.tokens import decode_token as decode_token
+
 _SCRYPT_N = 2**14
 _SCRYPT_R = 8
 _SCRYPT_P = 1
@@ -45,13 +47,3 @@ def verify_password(password: str, stored: str) -> bool:
 def create_token(user_id: int, secret: str) -> str:
     payload = {"sub": str(user_id), "exp": int(time.time()) + _TOKEN_TTL_S}
     return jwt.encode(payload, secret, algorithm="HS256")
-
-
-def decode_token(token: str, secret: str) -> int | None:
-    """Return the user id encoded in a valid token, else None."""
-    try:
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
-    except jwt.PyJWTError:
-        return None
-    sub = payload.get("sub")
-    return int(sub) if isinstance(sub, str) and sub.isdigit() else None

@@ -45,6 +45,7 @@ import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 try:
     from dotenv import load_dotenv
@@ -55,8 +56,14 @@ except Exception:
 
 # IMAP OAuth2 requires the full-mailbox scope — Gmail's `gmail.readonly` scope is for the
 # Gmail REST API only and doesn't work over IMAP (and wouldn't let us mark messages read,
-# which the pipeline needs to avoid reprocessing the same email).
-GMAIL_OAUTH_SCOPES = ["https://mail.google.com/"]
+# which the pipeline needs to avoid reprocessing the same email). userinfo.email lets us
+# discover *which* mailbox was just authorized (needed for the per-user OAuth path, where
+# there's no static EMAIL_EMAIL to fall back on) — this is a scope change from earlier
+# single-tenant deployments, so any previously cached token.json needs one-time re-consent.
+GMAIL_OAUTH_SCOPES = [
+    "https://mail.google.com/",
+    "https://www.googleapis.com/auth/userinfo.email",
+]
 
 # Force UTF-8 stdout/stderr on Windows so emojis and zero-width chars in emails
 # don't crash json.dumps output with cp1252 UnicodeEncodeError.
@@ -70,34 +77,83 @@ ATTACHMENT_CACHE = Path(__file__).resolve().parent / ".cache" / "email-att"
 ATTACHMENT_CACHE.mkdir(parents=True, exist_ok=True)
 
 
-def _default_path(env_var: str, filename: str) -> Path:
+def _default_path(env_var: str, filename: str, user_id: str | int | None = None) -> Path:
+    # An explicit env override always wins verbatim — that's the single-tenant/local-dev
+    # escape hatch (D4/D8 in the plan) and must not be silently re-nested per user.
     override = os.environ.get(env_var)
     if override:
         return Path(override).expanduser()
-    return Path.home() / ".hermes" / "mail" / filename
+    base = Path.home() / ".hermes" / "mail"
+    if user_id is not None:
+        base = base / str(user_id)
+    return base / filename
 
 
 def _credentials_path() -> Path:
+    # The OAuth *client* secret identifies the app registered with Google — legitimately
+    # shared infrastructure, never per-user (contrast with _token_path below).
     return _default_path("GMAIL_CREDENTIALS_PATH", "credentials.json")
 
 
-def _token_path() -> Path:
-    return _default_path("GMAIL_TOKEN_PATH", "token.json")
+def _token_path(user_id: str | int | None = None) -> Path:
+    return _default_path("GMAIL_TOKEN_PATH", "token.json", user_id)
 
 
-def _load_oauth_credentials(interactive: bool):
+def _meta_path(user_id: str | int | None = None) -> Path:
+    """Sibling of the token file: caches the mailbox address discovered from the OAuth grant
+    itself, since a per-user deployment has no static EMAIL_EMAIL to read instead."""
+    return _token_path(user_id).with_name("meta.json")
+
+
+def _fetch_gmail_address(creds) -> str | None:
+    import requests
+
+    try:
+        resp = requests.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {creds.token}"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        email = resp.json().get("email")
+        return email if isinstance(email, str) else None
+    except Exception:
+        return None
+
+
+def _mailbox_email(user_id: str | int | None = None) -> str | None:
+    """The mailbox address to log into IMAP as. Per-user: read from the cached OAuth
+    discovery (_meta_path). Legacy/global (user_id=None): the static EMAIL_EMAIL env var."""
+    if user_id is None:
+        return os.environ.get("EMAIL_EMAIL")
+    meta_path = _meta_path(user_id)
+    if not meta_path.exists():
+        return None
+    try:
+        email = json.loads(meta_path.read_text(encoding="utf-8")).get("email")
+        return email if isinstance(email, str) else None
+    except Exception:
+        return None
+
+
+def _load_oauth_credentials(interactive: bool, user_id: str | int | None = None):
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
 
-    token_path = _token_path()
+    token_path = _token_path(user_id)
     creds = None
     if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), GMAIL_OAUTH_SCOPES)
+        # Load with whatever scopes the token was actually granted, not the scopes we would
+        # request today: refreshing a token with a wider set than it was issued for fails with
+        # `invalid_scope`. userinfo.email is only needed to discover the mailbox address during
+        # a fresh consent, so an older mail-only token stays perfectly usable for IMAP.
+        creds = Credentials.from_authorized_user_file(str(token_path))
 
     if creds and creds.valid:
         return creds
 
+    fresh_consent = False
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     else:
@@ -114,32 +170,77 @@ def _load_oauth_credentials(interactive: bool):
             )
         flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), GMAIL_OAUTH_SCOPES)
         login_hint = os.environ.get("EMAIL_EMAIL")
+        # Google grants `openid` alongside userinfo.email without being asked, and oauthlib
+        # treats *any* difference between requested and granted scopes as fatal — it raises
+        # after the browser has already shown "you may close this window", so consent appears
+        # to succeed while the token is silently never written. Relaxing the check accepts the
+        # superset Google actually returns.
+        os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
         creds = flow.run_local_server(port=0, login_hint=login_hint)
+        fresh_consent = True
 
     token_path.parent.mkdir(parents=True, exist_ok=True)
     token_path.write_text(creds.to_json(), encoding="utf-8")
+
+    if fresh_consent and user_id is not None:
+        email = _fetch_gmail_address(creds)
+        if email:
+            _meta_path(user_id).write_text(json.dumps({"email": email}), encoding="utf-8")
+
     return creds
 
 
-def _oauth_login(conn: imaplib.IMAP4_SSL, user: str, interactive: bool = False) -> None:
-    creds = _load_oauth_credentials(interactive=interactive)
+def mailbox_status(user_id: str | int | None = None) -> dict[str, Any]:
+    """Whether this user's mailbox can actually be authenticated as, not merely whether a file
+    exists on disk.
+
+    A token file can exist and still be useless — revoked, expired past refresh, or written by
+    something that wasn't a real consent. Reporting "connected" off `Path.exists()` is how you
+    end up with a UI claiming a connection that fails the moment mail is fetched, so this
+    loads the credentials (refreshing if needed) and reports what went wrong when it can't.
+    """
+    if not _token_path(user_id).exists():
+        return {"connected": False, "reason": "no mailbox connected yet"}
+    try:
+        creds = _load_oauth_credentials(interactive=False, user_id=user_id)
+    except Exception as exc:  # refresh failure, revoked grant, malformed token file
+        return {"connected": False, "reason": f"stored credentials are unusable: {exc}"}
+    if not creds or not creds.valid:
+        return {"connected": False, "reason": "stored credentials could not be refreshed"}
+    return {"connected": True, "email": _mailbox_email(user_id)}
+
+
+def _oauth_login(
+    conn: imaplib.IMAP4_SSL,
+    user: str,
+    interactive: bool = False,
+    user_id: str | int | None = None,
+) -> None:
+    creds = _load_oauth_credentials(interactive=interactive, user_id=user_id)
     auth_string = f"user={user}\1auth=Bearer {creds.token}\1\1"
     conn.authenticate("XOAUTH2", lambda _challenge: auth_string.encode("ascii"))
 
 
-def _connect():
-    user = os.environ.get("EMAIL_EMAIL")
+def _connect(user_id: str | int | None = None):
     host = os.environ.get("EMAIL_IMAP_HOST")
     port = int(os.environ.get("EMAIL_IMAP_PORT") or 993)
-    pw = os.environ.get("EMAIL_APP_PASSWORD")
+    # EMAIL_APP_PASSWORD is a single global mailbox login — only meaningful on the legacy
+    # (no user_id) path; the multi-user path is OAuth-only (see D4 in the plan).
+    pw = os.environ.get("EMAIL_APP_PASSWORD") if user_id is None else None
+    user = _mailbox_email(user_id)
     if not (user and host):
+        if user_id is not None:
+            raise RuntimeError(
+                "No Gmail account connected for this user yet. Run the OAuth connect flow "
+                "first (POST /api/mail/connect)."
+            )
         raise RuntimeError("Missing EMAIL_EMAIL / EMAIL_IMAP_HOST in .env.")
 
     conn = imaplib.IMAP4_SSL(host, port)
     if pw:
         conn.login(user, pw)
     else:
-        _oauth_login(conn, user)
+        _oauth_login(conn, user, user_id=user_id)
     conn.select("INBOX")
     return conn
 
@@ -216,12 +317,12 @@ def _save_attachments(uid: str, msg):
     return out
 
 
-def cmd_list(since_minutes: int | None = None):
+def cmd_list(since_minutes: int | None = None, user_id: str | None = None):
     cutoff = None
     if since_minutes is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=since_minutes)
 
-    conn = _connect()
+    conn = _connect(user_id=user_id)
     try:
         # IMAP SINCE only has day granularity, so it's a coarse prefilter (avoids fetching a
         # whole old unread backlog) — the precise per-message Date check below does the rest.
@@ -269,8 +370,8 @@ def cmd_list(since_minutes: int | None = None):
             pass
 
 
-def cmd_mark_read(uid: str):
-    conn = _connect()
+def cmd_mark_read(uid: str, user_id: str | None = None):
+    conn = _connect(user_id=user_id)
     try:
         typ, _ = conn.uid("store", uid.encode("ascii"), "+FLAGS", "(\\Seen)")
         if typ != "OK":
@@ -283,34 +384,46 @@ def cmd_mark_read(uid: str):
             pass
 
 
-def cmd_auth():
-    user = os.environ.get("EMAIL_EMAIL")
+def cmd_auth(user_id: str | None = None):
+    _load_oauth_credentials(interactive=True, user_id=user_id)
+    user = _mailbox_email(user_id)
     if not user:
-        raise RuntimeError("Missing EMAIL_EMAIL in .env.")
-    _load_oauth_credentials(interactive=True)
-    print(json.dumps({"authenticated": user, "token_path": str(_token_path())}))
+        raise RuntimeError("OAuth consent completed but the mailbox address wasn't discovered.")
+    print(json.dumps({"authenticated": user, "token_path": str(_token_path(user_id))}))
 
 
 def main():
-    usage = "usage: emailtool.py list [--since-minutes N] | mark-read <uid> | auth"
-    if len(sys.argv) < 2:
+    usage = (
+        "usage: emailtool.py list [--since-minutes N] [--user-id ID] | "
+        "mark-read <uid> [--user-id ID] | auth [--user-id ID]"
+    )
+    argv = sys.argv[1:]
+    user_id: str | None = None
+    if "--user-id" in argv:
+        idx = argv.index("--user-id")
+        if idx + 1 >= len(argv):
+            print(usage, file=sys.stderr)
+            sys.exit(2)
+        user_id = argv[idx + 1]
+        del argv[idx : idx + 2]
+    if not argv:
         print(usage, file=sys.stderr)
         sys.exit(2)
-    mode = sys.argv[1]
+    mode = argv[0]
     try:
         if mode == "list":
             since_minutes = None
-            if "--since-minutes" in sys.argv:
-                idx = sys.argv.index("--since-minutes")
-                if idx + 1 >= len(sys.argv):
+            if "--since-minutes" in argv:
+                idx = argv.index("--since-minutes")
+                if idx + 1 >= len(argv):
                     print(usage, file=sys.stderr)
                     sys.exit(2)
-                since_minutes = int(sys.argv[idx + 1])
-            cmd_list(since_minutes)
-        elif mode == "mark-read" and len(sys.argv) >= 3:
-            cmd_mark_read(sys.argv[2])
+                since_minutes = int(argv[idx + 1])
+            cmd_list(since_minutes, user_id=user_id)
+        elif mode == "mark-read" and len(argv) >= 2:
+            cmd_mark_read(argv[1], user_id=user_id)
         elif mode == "auth":
-            cmd_auth()
+            cmd_auth(user_id=user_id)
         else:
             print(usage, file=sys.stderr)
             sys.exit(2)

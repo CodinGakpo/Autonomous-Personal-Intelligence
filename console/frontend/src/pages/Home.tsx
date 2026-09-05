@@ -3,11 +3,17 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 
 import type { View } from "@/App"
-import { MailChat } from "@/components/MailChat"
+import { MailIngestProgress } from "@/components/MailIngestProgress"
 import { MailMindmap } from "@/components/MailMindmap"
+import { MailReviewQueue } from "@/components/MailReviewQueue"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { type MailNode, getMailTree, reloadMail } from "@/lib/brainApi"
+import {
+  type MailNode,
+  type MailProgress,
+  getMailTree,
+  reloadMailStream,
+} from "@/lib/brainApi"
 
 const WINDOW_OPTIONS = [
   { label: "Last 15 minutes", minutes: 15 },
@@ -23,7 +29,16 @@ interface HomeRail {
   mailConnected: boolean | null
 }
 
-export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: View) => void }) {
+export function Home({
+  rail,
+  onNavigate,
+  onAskAbout,
+}: {
+  rail: HomeRail
+  onNavigate: (view: View) => void
+  /** Hand a question to the Chat tab — see App.tsx's chatSeed. */
+  onAskAbout: (question: string) => void
+}) {
   const connectionPercentage = rail.appsTotal > 0 ? Math.round((rail.appsConnected / rail.appsTotal) * 100) : 0
 
   return (
@@ -144,39 +159,56 @@ export function Home({ rail, onNavigate }: { rail: HomeRail; onNavigate: (view: 
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <MailPanel />
+          <MailPanel onAskAbout={onAskAbout} />
         </motion.div>
       )}
     </div>
   )
 }
 
-function MailPanel() {
+function MailPanel({ onAskAbout }: { onAskAbout: (question: string) => void }) {
   const [windowMinutes, setWindowMinutes] = useState(WINDOW_OPTIONS[0].minutes)
   const [reloading, setReloading] = useState(false)
   const [reloadResult, setReloadResult] = useState<string | null>(null)
   const [reloadError, setReloadError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<MailProgress | null>(null)
 
   const [showMindmap, setShowMindmap] = useState(false)
   const [treeLoading, setTreeLoading] = useState(false)
   const [treeError, setTreeError] = useState<string | null>(null)
   const [tree, setTree] = useState<MailNode | null>(null)
 
+  const [reviewKey, setReviewKey] = useState(0)
+
+  async function refreshTree() {
+    setTree(await getMailTree())
+  }
+
+  // A fix made in the review list moves a thread, so the map (if open) is now stale.
+  async function refreshAfterReview() {
+    if (showMindmap) await refreshTree()
+  }
+
   async function handleReload() {
     setReloading(true)
     setReloadError(null)
     setReloadResult(null)
+    setProgress(null)
     try {
-      const result = await reloadMail(windowMinutes)
-      setReloadResult(`Found ${result.processed} new email${result.processed === 1 ? "" : "s"}.`)
-      if (showMindmap) {
-        const updated = await getMailTree()
-        setTree(updated)
-      }
+      // Streamed so the progress bar reflects real per-email progress, not a guess.
+      const events = await reloadMailStream(windowMinutes, setProgress)
+      const failure = events.find((e) => e.stage === "failed")
+      if (failure) throw new Error(failure.error ?? "Mail ingest failed.")
+      const processed = events.find((e) => e.stage === "done")?.processed ?? 0
+      setReloadResult(`Found ${processed} new email${processed === 1 ? "" : "s"}.`)
+      // Newly ingested mail may itself be low-confidence, so re-run the review list.
+      setReviewKey((k) => k + 1)
+      if (showMindmap) await refreshTree()
     } catch (err) {
       setReloadError(err instanceof Error ? err.message : "Couldn't check for new mail.")
     } finally {
       setReloading(false)
+      setProgress(null)
     }
   }
 
@@ -201,6 +233,8 @@ function MailPanel() {
 
   return (
     <div className="flex flex-col gap-6">
+      <MailReviewQueue key={reviewKey} onResolved={refreshAfterReview} />
+
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-4 border-b border-border/50 bg-secondary/20 pb-4">
           <div>
@@ -233,9 +267,19 @@ function MailPanel() {
             </Button>
           </div>
         </CardHeader>
-        
-        {(reloadResult || reloadError) && (
-          <div className={`px-6 py-3 text-sm font-medium border-b border-border/50 ${reloadError ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-500'}`}>
+
+        {reloading && (
+          <CardContent>
+            <MailIngestProgress event={progress} />
+          </CardContent>
+        )}
+
+        {!reloading && (reloadResult || reloadError) && (
+          <div
+            className={`px-6 py-3 text-sm font-medium border-b border-border/50 ${
+              reloadError ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-500"
+            }`}
+          >
             {reloadResult && <span>✓ {reloadResult}</span>}
             {reloadError && <span>! {reloadError}</span>}
           </div>
@@ -257,15 +301,13 @@ function MailPanel() {
                   {treeError}
                 </div>
               )}
-              {tree && <MailMindmap data={tree} />}
+              {tree && (
+                <MailMindmap data={tree} onReclassified={refreshTree} onAskAbout={onAskAbout} />
+              )}
             </CardContent>
           </Card>
         </motion.div>
       )}
-
-      <div className="max-w-[420px]">
-        <MailChat />
-      </div>
     </div>
   )
 }

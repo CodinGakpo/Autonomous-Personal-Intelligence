@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from console.backend import auth, health, onboarding, resume
+from console.backend import auth, chat, health, onboarding, resume
 from console.backend.config import Settings, get_settings
 from console.backend.db import configure_engine, seed_admin
 
@@ -44,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(onboarding.router)
     app.include_router(resume.router)
+    app.include_router(chat.router)
     return app
 
 
