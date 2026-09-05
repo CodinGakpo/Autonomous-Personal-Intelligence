@@ -4,11 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* A light, plain-language everyday assistant — not an ops/systems console. One typeface,
-   generous rounding, a friendly blue accent. Optimized for a first-time visitor to understand
-   at a glance, not for density or technical flavor.
-   Palette: page #FAFAF9, card #FFFFFF, ink #1F2328, dim #6B7280,
-   primary (accent) #4C6FFF, caution (pending) #B45309, danger #DC2626. */
+/* A sleek, professional light and dark mode designed for industry apps. */
 :root {
   --radius: 0.75rem;
   --background: #fafaf9;
@@ -17,7 +13,7 @@
   --card-foreground: #1f2328;
   --popover: #ffffff;
   --popover-foreground: #1f2328;
-  --primary: #4c6fff;
+  --primary: #4f46e5;
   --primary-foreground: #ffffff;
   --secondary: #f1f2f4;
   --secondary-foreground: #1f2328;
@@ -27,10 +23,35 @@
   --accent-foreground: #1f2328;
   --caution: #fef3c7;
   --caution-foreground: #92400e;
-  --destructive: #dc2626;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
   --border: #e5e7eb;
   --input: #d1d5db;
-  --ring: #4c6fff;
+  --ring: #4f46e5;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+  --caution: #3f2c00;
+  --caution-foreground: #fde68a;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fca5a5;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #4f46e5;
 }
 
 @theme inline {
@@ -55,6 +76,7 @@
   --color-caution: var(--caution);
   --color-caution-foreground: var(--caution-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -77,11 +99,13 @@
   select {
     appearance: none;
     background-color: var(--color-card);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.7rem center;
     padding-right: 2rem;
     color: var(--color-foreground);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
   }
   select option {
     background-color: var(--color-card);
@@ -96,5 +120,13 @@
     height: 8px;
     border-radius: 999px;
     background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+  }
+  
+  .glass-card {
+    background: rgba(24, 24, 27, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 }

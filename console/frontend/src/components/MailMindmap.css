@@ -1,17 +1,18 @@
 /* Scoped port of brain/mail_tree.html's D3 tree styling — kept as its own stylesheet since it's
    SVG-heavy styling Tailwind utilities don't cover well. Colors match the original 1:1. */
 .mail-mindmap-root {
-  --mm-bg: #0d1017;
-  --mm-panel: #151a23;
-  --mm-panel2: #1b2230;
-  --mm-line: #252d3a;
-  --mm-ink: #e6ebf2;
-  --mm-muted: #8b96a8;
-  --mm-accent: #4dd0c4;
-  --mm-cat: #6b7a99;
-  --mm-topic: #3fae90;
-  --mm-thread: #5b8cff;
-  --mm-link: #3a4356;
+  /* Light mode defaults */
+  --mm-bg: #f8fafc;
+  --mm-panel: #ffffff;
+  --mm-panel2: #f1f5f9;
+  --mm-line: #e2e8f0;
+  --mm-ink: #0f172a;
+  --mm-muted: #64748b;
+  --mm-accent: #0f766e;
+  --mm-cat: #475569;
+  --mm-topic: #059669;
+  --mm-thread: #2563eb;
+  --mm-link: #cbd5e1;
 
   position: relative;
   height: 640px;
@@ -20,6 +21,21 @@
   border-radius: var(--radius, 0.625rem);
   overflow: hidden;
   font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  border: 1px solid var(--mm-line);
+}
+
+.dark .mail-mindmap-root {
+  --mm-bg: #09090b;
+  --mm-panel: #18181b;
+  --mm-panel2: #27272a;
+  --mm-line: #3f3f46;
+  --mm-ink: #fafafa;
+  --mm-muted: #a1a1aa;
+  --mm-accent: #4dd0c4;
+  --mm-cat: #6b7a99;
+  --mm-topic: #3fae90;
+  --mm-thread: #5b8cff;
+  --mm-link: #52525b;
 }
 
 .mail-mindmap-chart {
@@ -56,15 +72,15 @@
 }
 .mail-mindmap-root .node.root rect,
 .mail-mindmap-root .node.mail_category rect {
-  fill: #20263a;
+  fill: var(--mm-panel2);
   stroke: var(--mm-cat);
 }
 .mail-mindmap-root .node.mail_topic rect {
-  fill: #152a24;
+  fill: var(--mm-panel2);
   stroke: var(--mm-topic);
 }
 .mail-mindmap-root .node.mail_thread rect {
-  fill: #151d30;
+  fill: var(--mm-panel2);
   stroke: var(--mm-thread);
 }
 .mail-mindmap-root .node.mail_thread {
